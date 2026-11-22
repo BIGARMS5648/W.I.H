@@ -97,6 +97,10 @@ function HeroBuild.makeUnit(heroId, opts)
         Sheet.add(static, "AttackSpeed", Stats.FLAT, speed)
     end
     if opts.account then Sheet.merge(static, opts.account) end
+    -- 영웅별 화력 보정 [독자: Data/HeroTuning.lua]
+    local tuning = WIH.HeroTuning and WIH.HeroTuning.damage
+    local factor = tuning and (tuning[heroId .. (form and (":" .. form) or "")] or tuning[heroId])
+    if factor and factor ~= 1 then Sheet.add(static, "DamageDealt", Stats.MORE, (factor - 1) * 1000) end
 
     local melee = range <= 200
     local u = Unit.new({

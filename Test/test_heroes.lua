@@ -209,4 +209,23 @@ T.case("화력 측정이 동작한다(모든 영웅의 초당 피해가 0보다 
     end
 end)
 
+T.case("영웅별 화력 보정 계수: 모든 영웅·형태에 있고 0.4~2.5 안이다(Test/tune_heroes.lua가 만든 값)", function()
+    local tuning = WIH.HeroTuning.damage
+    local n = 0
+    for _, h in ipairs(Heroes.list) do
+        for _, form in ipairs(formsOf(h)) do
+            local key = h.id .. (form and (":" .. form) or "")
+            local f = tuning[key]
+            T.ok(f and f >= 0.4 and f <= 2.5, "계수 없음 또는 범위 밖: " .. key)
+            n = n + 1
+        end
+    end
+    local count = 0
+    for _ in pairs(tuning) do count = count + 1 end
+    T.eq(count, n, "남는 계수가 없다")
+    -- 계수가 실제로 걸린다
+    local a = HeroBuild.makeUnit("war_arms", {})
+    T.near(a:get("DamageDealt"), tuning.war_arms, 1e-9)
+end)
+
 if not T.report("test_heroes") then os.exit(1) end

@@ -185,7 +185,7 @@ T.case("공명: 힘의 축복·끈기·빈 칸", function()
     end
     T.ok(Relics.resonating(s, king), "잊힌 왕 공명")
     local k = sheetAfter(king)
-    T.near(k:get("DamageDealt") - base:get("DamageDealt"), 0.05 * 4, 1e-9)
+    T.near(k:get("DamageDealt") / base:get("DamageDealt"), 1 + 0.05 * 4, 1e-9, "주는 피해 +20%(영웅 보정 계수와 곱해진다)")
     T.near(k:get("TakenAll") - base:get("TakenAll"), -0.05 * 4, 1e-9)
 end)
 

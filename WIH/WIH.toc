@@ -23,6 +23,7 @@ Data\Skills_Warrior_Paladin_Hunter.lua
 Data\Skills_Rogue_Priest_Shaman.lua
 Data\Skills_Mage_Warlock_Druid_Tinker.lua
 Data\SkillTools.lua
+Data\HeroTuning.lua
 Progression\HeroBuild.lua
 Progression\Level.lua
 Data\Monsters.lua
