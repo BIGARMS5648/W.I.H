@@ -34,9 +34,12 @@ end
 local function dress(s, heroId, level)
     local h = s.heroes[heroId]
     h.gear = {}
-    for _, item in pairs(Items.byId) do
-        if item.level == level and item.grade == GRADE and Items.usableBy(item, heroId) and not h.gear[item.slot] then
-            h.gear[item.slot] = { id = item.id }
+    -- 고유 능력치가 없는 장비를 먼저 고르고, 그 자리에 그런 장비가 없으면 있는 것을 낀다
+    for pass = 1, 2 do
+        for _, item in pairs(Items.byId) do
+            if item.level == level and item.grade == GRADE and (pass == 2 or not item.unique) and Items.usableBy(item, heroId) and not h.gear[item.slot] then
+                h.gear[item.slot] = { id = item.id }
+            end
         end
     end
 end
