@@ -129,17 +129,58 @@ local function create(parent)
     f.reset:SetPoint("TOPLEFT", 14, -334)
     f.reset.tooltip = { title = "전체 초기화", lines = { "진영 선택부터 다시 시작합니다. 현재 상태는 백업 1번으로 남아 되돌릴 수 있습니다." } }
 
-    -- 기록
-    section(f, "기록", -376)
-    f.stats = UI.paragraph(f, 11, C.sub)
-    f.stats:SetPoint("TOPLEFT", 14, -404)
-    f.stats:SetPoint("TOPRIGHT", -14, -404)
+    -- 화면: 전투 표시와 사냥 띠
+    section(f, "화면", -376)
+    f.display = {}
+    local function opt(label, width, tip, onClick)
+        local b = UI.button(f, label, width, 26, function(self)
+            onClick(self)
+            UI.screens.settings.refresh(f)
+        end)
+        b.tooltip = { title = label, lines = { tip } }
+        local prev = f.display[#f.display]
+        if prev then b:SetPoint("LEFT", prev, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", 14, -404) end
+        f.display[#f.display + 1] = b
+        return b
+    end
+    f.optModels = opt("3D 모델", 86, "전투 장면과 영웅 화면에 캐릭터 모델을 씁니다. 끄면 아이콘으로 표시합니다.", function()
+        local o = WIH.Scene.options()
+        o.models = not o.models
+        if WIH.Main.built.heroes then WIH.Main.built.heroes.modelKey = nil end
+    end)
+    f.optFlip = opt("방향 뒤집기", 96, "모델이 반대쪽을 보고 있을 때 켭니다(영웅은 오른쪽, 적은 왼쪽을 봐야 합니다).", function()
+        local o = WIH.Scene.options()
+        o.modelFlip = not o.modelFlip
+    end)
+    f.optLimit = opt("", 96, "전투 장면에서 모델로 보여 줄 수의 상한입니다. 영웅과 보스는 늘 모델로 보여 주고, 나머지 적은 이 수까지만 모델로 보여 줍니다. 화면이 끊기면 낮추세요.", function()
+        local o = WIH.Scene.options()
+        local steps = { 4, 8, 12, 20, 30 }
+        local nextValue = steps[1]
+        for i, v in ipairs(steps) do
+            if o.modelLimit == v then nextValue = steps[i % #steps + 1] end
+        end
+        o.modelLimit = nextValue
+        if WIH.Strip.scene then WIH.Strip.scene.battle = nil end      -- 장면을 다시 꾸민다
+    end)
+    f.optStrip = opt("", 96, "사냥 띠를 숨기거나 다시 보입니다. 숨겨도 사냥은 계속됩니다. 채팅창에 /wih 띠 를 입력해도 됩니다.", function()
+        WIH.Strip.toggleHidden()
+    end)
+    f.optLock = opt("", 96, "사냥 띠를 끌어서 옮기거나 폭을 바꾸지 못하게 고정합니다.", function()
+        WIH.Strip.setLocked(not WIH.Strip.saved().locked)
+    end)
+    opt("띠 위치 초기화", 106, "사냥 띠를 처음 자리(화면 아래 가운데)와 처음 폭으로 되돌립니다.", function()
+        WIH.Strip.resetPlace()
+    end)
+    opt("모델 점검", 86, "영웅과 몬스터의 모델이 제대로 나오는지 한눈에 봅니다. 잘못 나오는 것을 알려 주시면 고칩니다.", function()
+        WIH.Main.show("modelcheck")
+    end)
 
     -- 오류
     f.errorTitle = section(f, "최근 오류", -446)
     f.errors = UI.paragraph(f, 11, C.bad)
     f.errors:SetPoint("TOPLEFT", 14, -474)
     f.errors:SetPoint("TOPRIGHT", -130, -474)
+    f.errors:SetHeight(44)
     f.resume = UI.button(f, "진행 다시 시작", 110, 24, function()
         App.paused = false
         App.restartStage()
@@ -163,7 +204,8 @@ local function refresh(f)
         .. "   ·   저장 형식 " .. tostring(s.schema) .. "   ·   시작 " .. stamp(s.createdAt) .. "   ·   마지막 저장 " .. stamp(s.savedAt) }
     for i = 1, math.min(2, #(info.notes or {})) do lines[#lines + 1] = "· " .. info.notes[i] end
     if #(info.notes or {}) > 2 then lines[#lines + 1] = "· 그 밖에 " .. (#info.notes - 2) .. "건" end
-    lines[#lines + 1] = "저장은 접속 종료나 화면 다시 불러오기 때 클라이언트가 기록합니다."
+    local version = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
+    lines[#lines + 1] = "저장은 접속 종료나 화면 다시 불러오기 때 클라이언트가 기록합니다.   ·   버전 " .. tostring(version)
     f.saveInfo:SetText(table.concat(lines, "\n"))
 
     local list = type(WIH_DB_BACKUP) == "table" and WIH_DB_BACKUP or {}
@@ -179,11 +221,13 @@ local function refresh(f)
     f.reset:setText("전체 초기화")
     f.resetArmed = nil
 
-    local st = s.stats
-    local version = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
-    f.stats:SetText(string.format("진행 시간 %s   ·   처치 %s   ·   보스 처치 %s   ·   클리어 %s   ·   전멸 %s   ·   번 골드 %s\n버전 %s   ·   최대 레벨 %d   ·   전투 계산 간격 %.2f초",
-        duration(st.playSeconds), UI.number(st.kills), UI.number(st.bossKills), UI.number(st.clears), UI.number(st.fails),
-        UI.number(math.floor(st.goldEarned)), tostring(version), Tables.MAX_LEVEL, WIH.TICK))
+    local o = WIH.Scene.options()
+    f.optModels:setSelected(o.models)
+    f.optFlip:setSelected(o.modelFlip == true)
+    f.optLimit:setText("모델 수 " .. o.modelLimit)
+    f.optStrip:setText(WIH.Strip.saved().hidden and "띠 보이기" or "띠 숨기기")
+    f.optLock:setText(WIH.Strip.saved().locked and "띠 고정 해제" or "띠 고정")
+    f.optLock:setSelected(WIH.Strip.saved().locked == true)
 
     local errs = App.lastErrors
     if #errs == 0 then

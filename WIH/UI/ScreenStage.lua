@@ -282,4 +282,4 @@ local function update(f, elapsed)
     f.info:setHeight((f.body:GetStringHeight() or 400) + 10)
 end
 
-UI.screens.stage = { label = "스테이지", order = 5, create = create, refresh = refresh, update = update }
+UI.screens.stage = { label = "스테이지", order = 4, create = create, refresh = refresh, update = update }

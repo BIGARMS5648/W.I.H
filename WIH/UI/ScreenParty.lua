@@ -210,4 +210,4 @@ local function refresh(f)
     f.hint:SetText(f.dirty and "바꾼 편성은 다음 스테이지부터 적용됩니다." or ("편성 칸 " .. #s.party .. " / " .. slots))
 end
 
-UI.screens.party = { label = "편성", order = 4, create = create, refresh = refresh }
+UI.screens.party = { label = "편성", order = 3, create = create, refresh = refresh }

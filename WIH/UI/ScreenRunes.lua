@@ -250,4 +250,4 @@ local function update(f, elapsed)
     f.summaryScroll:setHeight((f.summary:GetStringHeight() or 200) + 10)
 end
 
-UI.screens.runes = { label = "룬", order = 6, create = create, refresh = refresh, update = update, paint = paint, onShow = onShow }
+UI.screens.runes = { label = "성장", order = 5, create = create, refresh = refresh, update = update, paint = paint, onShow = onShow }

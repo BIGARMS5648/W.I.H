@@ -14,6 +14,58 @@ App.loadInfo = nil       -- 저장을 불러온 결과 {status, notes}
 App.readOnly = false     -- 더 새 버전의 저장을 만났을 때: 아무것도 덮어쓰지 않는다
 App.lastErrors = {}
 App.watchers = {}        -- 상태가 바뀌었을 때 알림을 받을 화면들
+App.log = {}             -- 최근 진행 기록(문장). 사냥 띠와 기록 화면이 읽는다
+App.lastLoot = nil       -- 가장 최근에 얻은 것의 표기
+local LOG_LIMIT = 40
+
+local function stageName(key)
+    local n = key % 1000
+    if n % 100 == 10 then
+        local raid = WIH.Raids.byAct[math.floor(n / 100)]
+        return raid and (raid.name .. " 레이드") or ""
+    end
+    local sec = WIH.Dungeons.sections[n]
+    return sec and sec.name or ""
+end
+App.stageName = stageName
+
+function App.addLog(line)
+    local log = App.log
+    log[#log + 1] = line
+    while #log > LOG_LIMIT do table.remove(log, 1) end
+end
+
+-- 진행 이벤트를 기록 문장으로 바꾼다.
+local function record(ev, a, b, c)
+    local Chests, Items = WIH.Chests, WIH.Items
+    if ev == "boss" and a then
+        App.addLog("보스 등장: " .. a.name)
+    elseif ev == "clear" then
+        App.addLog("|cff70b880클리어|r  " .. stageName(a))
+    elseif ev == "fail" then
+        App.addLog("|cffd06058전멸|r  " .. stageName(a))
+    elseif ev == "levelUp" then
+        App.addLog(WIH.Heroes.byId[a].name .. " 레벨 " .. b)
+    elseif ev == "firstClear" then
+        local names = {}
+        for _, item in ipairs(a) do names[#names + 1] = Items.name(item) end
+        App.lastLoot = table.concat(names, ", ")
+        App.addLog("|cffd9b05e첫 클리어 보상|r  " .. App.lastLoot .. "  (가방에서 장착하세요)")
+    elseif ev == "chest" then
+        App.addLog(Chests.NAMES[a] .. "를 얻었습니다.")
+    elseif ev == "loot" then
+        App.lastLoot = Chests.resultText(b)
+        App.addLog(Chests.NAMES[a] .. " 자동 개봉: " .. App.lastLoot)
+    elseif ev == "token" then
+        App.addLog("|cffd9b05e" .. WIH.Raids.TOKEN_NAME .. "|r 1개를 얻었습니다. 스테이지 화면에서 레이드에 도전할 수 있습니다.")
+    elseif ev == "raidClear" then
+        if b == "opened" then App.lastLoot = Chests.resultText(c) end
+        App.addLog("|cffd9b05e레이드 클리어|r  레이드 상자를 " .. (b == "opened" and ("바로 열었습니다: " .. App.lastLoot) or "받았습니다."))
+    elseif ev == "raidUnlocked" then
+        local act = math.floor(a % 1000 / 100)
+        App.addLog("이 액트의 던전을 모두 돌파했습니다. 다음으로 가려면 스테이지 화면에서 |cffd9b05e" .. WIH.Raids.byAct[act].name .. "|r 레이드를 클리어해야 합니다.")
+    end
+end
 
 local function now()
     if GetServerTime then return GetServerTime() end
@@ -32,6 +84,10 @@ local function startSession()
     local seed = (now() % 100000) + 1
     App.session = Session.new(App.state, { seed = seed })
     App.session:addListener(function(ev, a, b, c)
+        if ev ~= "battle" and ev ~= "kill" and ev ~= "wave" and ev ~= "stageStart" then
+            local ok, err = pcall(record, ev, a, b, c)
+            if not ok then WIH.UI.reportError(err) end
+        end
         if ev == "levelUp" or ev == "clear" or ev == "fail" or ev == "stageStart" or ev == "raidUnlocked"
             or ev == "chest" or ev == "loot" or ev == "firstClear" or ev == "raidClear" or ev == "token" then
             App.notify(ev)
@@ -64,6 +120,7 @@ function App.resetAll()
         WIH_DB_BACKUP = Save.pushBackup(WIH_DB_BACKUP, App.state, now())
     end
     App.state, App.session = nil, nil
+    App.log, App.lastLoot = {}, nil
     WIH_DB = nil
     App.notify("reset")
     return true
@@ -149,9 +206,15 @@ driver:SetScript("OnUpdate", function(_, elapsed)
     end
 end)
 
+-- /wih : 메뉴 창을 여닫는다.  /wih 띠 : 사냥 띠를 보이거나 숨긴다.
 SLASH_WIH1 = "/wih"
-SlashCmdList["WIH"] = function()
-    if WIH.Main then WIH.Main.toggle() end
+SlashCmdList["WIH"] = function(msg)
+    msg = type(msg) == "string" and msg:lower() or ""
+    if (msg:find("띠") or msg:find("strip")) and WIH.Strip then
+        WIH.Strip.toggleHidden()
+    elseif WIH.Main then
+        WIH.Main.toggle()
+    end
 end
 
 function WIH_OnCompartmentClick()

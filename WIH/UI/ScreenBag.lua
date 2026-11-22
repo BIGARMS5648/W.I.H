@@ -1,5 +1,5 @@
--- 가방 화면: 영웅의 장비 10칸, 인벤토리, 상자 보관함.
--- 규칙은 Inventory/와 Chests의 함수가 판단한다. 이 화면은 보여 주고 그 함수를 부르기만 한다.
+-- 가방 화면: 인벤토리(필터·정렬·장착·잠금·팔기)와 상자 보관함. 장비 칸은 영웅 화면에 있다.
+-- 규칙은 Inventory와 Chests의 함수가 판단한다. 이 화면은 보여 주고 그 함수를 부르기만 한다.
 
 local _, WIH = ...
 local UI = WIH.module("UI")
@@ -12,12 +12,17 @@ local Chests = WIH.module("Chests")
 local ChestTable = WIH.module("ChestTable")
 
 local C = UI.C
-local CELL, COLS = 38, 9
-local BULK_GRADE = 2        -- "일반·고급 모두 팔기"의 등급 상한
+local CELL, COLS, ROWS = 38, 12, 8
+local BULK_GRADE = 2        -- "일반·고급 팔기"의 등급 상한
+local FILTERS = {
+    { "all", "전체" }, { "MAIN", "주무기" }, { "SUB", "보조무기" }, { "ARMOR", "방어구" }, { "ACC", "장신구" }, { "usable", "착용 가능" },
+}
+local GROUP = { MAIN = "MAIN", SUB = "SUB", HELMET = "ARMOR", ARMOR = "ARMOR", GLOVES = "ARMOR", BOOTS = "ARMOR",
+    AMULET = "ACC", EARRING = "ACC", RING = "ACC", BRACER = "ACC" }
 
 local function gradeColor(item) return Items.GRADES[item.grade].color end
 
--- 아이템 툴팁의 내용. compareTo가 있으면 지금 낀 것과의 비교를 덧붙인다.
+-- 아이템 툴팁의 내용. compareTo가 있으면 지금 낀 것을 덧붙인다.
 function UI.itemTip(item, entry, compareTo)
     local lines = {}
     lines[#lines + 1] = { Items.gradeName(item) .. "  ·  " .. Items.SLOT_NAMES[item.slot] .. "  ·  아이템 레벨 " .. item.level, gradeColor(item) }
@@ -39,7 +44,9 @@ function UI.itemTip(item, entry, compareTo)
     return { title = Items.name(item), lines = lines }
 end
 
-local function selectedHero(f)
+UI.lootText = Chests.resultText
+
+local function target(f)
     local s = App.state
     if not f.heroId or not s.heroes[f.heroId] then f.heroId = s.party[1] end
     return f.heroId
@@ -49,81 +56,43 @@ local function note(ok, why)
     if not ok and why then WIH.Main.notice(why, C.bad) end
 end
 
-local function lootText(result)
-    if result.item then
-        local where = result.where == "mail" and " (가방이 가득 차 임시 보관함으로)" or ""
-        return Items.name(result.item) .. " [" .. Items.gradeName(result.item) .. "]" .. where
-    end
-    return Chests.materialName(result.material)
+local function passes(f, item)
+    if f.filter == "all" then return true end
+    if f.filter == "usable" then return Items.usableBy(item, target(f)) end
+    return GROUP[item.slot] == f.filter
 end
-UI.lootText = lootText
 
 local function create(parent)
     local f = CreateFrame("Frame", nil, parent)
+    f.filter = "all"
+    f.view = {}             -- 화면의 칸 번호 → 인벤토리 번호
     f.selected = nil        -- 고른 인벤토리 번호
 
-    -- 왼쪽: 보유 영웅
-    f.heroList = UI.scroll(f)
-    f.heroList:SetPoint("TOPLEFT", 10, -10)
-    f.heroList:SetPoint("BOTTOMLEFT", 10, 96)
-    f.heroList:SetWidth(132)
-    f.heroRows = {}
-
-    -- 가운데: 장비 10칸
-    local eq = UI.panel(f, C.panel, true)
-    eq:SetPoint("TOPLEFT", f.heroList, "TOPRIGHT", 10, 0)
-    eq:SetSize(292, 10 * 34 + 44)
-    f.eqTitle = UI.text(eq, 13, C.text)
-    f.eqTitle:SetPoint("TOPLEFT", 10, -10)
-    f.eqSub = UI.text(eq, 11, C.sub)
-    f.eqSub:SetPoint("TOPLEFT", 10, -28)
-    f.slots = {}
-    for i, slot in ipairs(Items.SLOTS) do
-        local row = CreateFrame("Frame", nil, eq)
-        row:SetSize(272, 30)
-        row:SetPoint("TOPLEFT", 10, -44 - (i - 1) * 34)
-        row.label = UI.text(row, 11, C.dim)
-        row.label:SetPoint("LEFT", 0, 0)
-        row.label:SetWidth(52)
-        row.label:SetText(Items.SLOT_NAMES[slot])
-        row.icon = UI.icon(row, 28)
-        row.icon:SetPoint("LEFT", 54, 0)
-        row.name = UI.text(row, 12, C.text)
-        row.name:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
-        row.name:SetPoint("RIGHT", -50, 0)
-        row.off = UI.button(row, "해제", 44, 22, function()
-            note(Inventory.unequip(App.state, selectedHero(f), slot))
-            f.dirty = true
+    -- 첫 줄: 장착 대상
+    local tl = UI.label(f, "장착 대상")
+    tl:SetPoint("TOPLEFT", 12, -17)
+    f.targets = {}
+    -- 둘째 줄: 필터, 가방 용량과 버튼
+    f.filters = {}
+    local x = 12
+    for _, it in ipairs(FILTERS) do
+        local b = UI.chip(f, it[2], function()
+            f.filter = it[1]
+            f.selected = nil
             UI.screens.bag.refresh(f)
         end)
-        row.off:SetPoint("RIGHT", 0, 0)
-        UI.setTooltip(row, function()
-            local item, entry = Inventory.equipped(App.state, selectedHero(f), slot)
-            if not item then return { title = Items.SLOT_NAMES[slot], lines = { "비어 있습니다." } } end
-            return UI.itemTip(item, entry)
-        end)
-        f.slots[slot] = row
+        b:SetPoint("TOPLEFT", x, -44)
+        b.id = it[1]
+        f.filters[#f.filters + 1] = b
+        x = x + b:GetWidth() + 5
     end
-    f.apply = UI.button(f, "지금 적용", 90, 24, function()
-        f.dirty = false
-        App.restartStage()
-        UI.screens.bag.refresh(f)
-    end)
-    f.apply:SetPoint("TOPLEFT", eq, "BOTTOMLEFT", 0, -8)
-    f.apply.tooltip = { title = "지금 적용", lines = { "현재 스테이지를 처음부터 다시 시작해 바꾼 장비를 바로 적용합니다. 누르지 않으면 다음 스테이지부터 적용됩니다." } }
-    f.applyHint = UI.text(f, 11, C.dim)
-    f.applyHint:SetPoint("LEFT", f.apply, "RIGHT", 10, 0)
-
-    -- 오른쪽: 인벤토리
-    f.bagTitle = UI.text(f, 13, C.text)
-    f.bagTitle:SetPoint("TOPLEFT", 456, -12)
     f.sort = UI.button(f, "정렬", 46, 22, function()
         Inventory.sort(App.state)
         f.selected = nil
         UI.screens.bag.refresh(f)
     end)
-    f.sort:SetPoint("TOPRIGHT", -10, -8)
-    f.buy = UI.button(f, "", 110, 22, function()
+    f.sort:SetPoint("TOPRIGHT", -12, -44)
+    f.buy = UI.button(f, "", 116, 22, function()
         note(Inventory.buySlot(App.state))
         UI.screens.bag.refresh(f)
     end)
@@ -142,62 +111,72 @@ local function create(parent)
     end)
     f.bulk:SetPoint("RIGHT", f.buy, "LEFT", -6, 0)
     f.bulk.tooltip = { title = "일반·고급 팔기", lines = { "가방에 있는 일반·고급 등급 장비를 모두 연금술로 골드로 바꿉니다. 잠근 것과 낀 것은 팔리지 않습니다." } }
+    f.bagTitle = UI.text(f, 12, C.text, "RIGHT")
+    f.bagTitle:SetPoint("RIGHT", f.bulk, "LEFT", -14, 0)
 
+    -- 칸
     f.grid = UI.scroll(f)
-    -- 위치는 창 기준 좌표로 적는다(영웅 목록 10 + 132, 장비 칸 10 + 292, 간격 12 → 왼쪽 456).
-    f.grid:SetPoint("TOPLEFT", 456, -46)
-    f.grid:SetPoint("TOPRIGHT", -10, -46)
-    f.grid:SetHeight(4 * (CELL + 4) + 2)
+    f.grid:SetPoint("TOPLEFT", 12, -78)
+    f.grid:SetSize(COLS * (CELL + 4), ROWS * (CELL + 4))
     f.cells = {}
 
     -- 고른 아이템의 상세
     local d = UI.panel(f, C.panel, true)
-    d:SetPoint("TOPLEFT", 456, -46 - (4 * (CELL + 4) + 2) - 8)
-    d:SetPoint("BOTTOMRIGHT", -10, 96)
+    d:SetPoint("TOPLEFT", 12 + COLS * (CELL + 4) + 12, -78)
+    d:SetPoint("BOTTOMRIGHT", -12, 100)
     f.detail = d
-    f.dIcon = UI.icon(d, 34)
-    f.dIcon:SetPoint("TOPLEFT", 10, -10)
-    f.dName = UI.text(d, 13, C.text)
-    f.dName:SetPoint("TOPLEFT", f.dIcon, "TOPRIGHT", 10, 0)
+    f.dIcon = UI.icon(d, 40)
+    f.dIcon:SetPoint("TOPLEFT", 12, -12)
+    f.dName = UI.text(d, 14, C.text)
+    f.dName:SetPoint("TOPLEFT", 62, -13)
     f.dMeta = UI.text(d, 11, C.sub)
-    f.dMeta:SetPoint("TOPLEFT", f.dName, "BOTTOMLEFT", 0, -5)
-    f.dBody = UI.paragraph(d, 11, C.sub)
-    f.dBody:SetPoint("TOPLEFT", 10, -52)
-    f.dBody:SetPoint("TOPRIGHT", -10, -52)
-    f.dEmpty = UI.text(d, 12, C.dim)
-    f.dEmpty:SetPoint("TOPLEFT", 12, -14)
-    f.dEmpty:SetText("가방의 아이템을 누르면 여기에 내용이 나옵니다.")
-    f.dEquip = UI.button(d, "장착", 70, 24, function()
-        note(Inventory.equip(App.state, selectedHero(f), f.selected))
+    f.dMeta:SetPoint("TOPLEFT", 62, -34)
+    f.dBody = UI.paragraph(d, 12, C.sub)
+    f.dBody:SetPoint("TOPLEFT", 12, -66)
+    f.dBody:SetPoint("TOPRIGHT", -12, -66)
+    if f.dBody.SetSpacing then f.dBody:SetSpacing(3) end
+    f.dEmpty = UI.paragraph(d, 12, C.dim)
+    f.dEmpty:SetPoint("TOPLEFT", 14, -16)
+    f.dEmpty:SetPoint("TOPRIGHT", -14, -16)
+    f.dEmpty:SetText("아이템을 누르면 여기에 내용이 나옵니다.\n오른쪽 클릭하면 장착 대상에게 바로 낍니다.")
+    f.dEquip = UI.button(d, "장착", 76, 26, function()
+        note(Inventory.equip(App.state, target(f), f.selected))
         f.dirty = true
         f.selected = nil
         UI.screens.bag.refresh(f)
     end)
-    f.dEquip:SetPoint("BOTTOMLEFT", 10, 10)
-    f.dLock = UI.button(d, "잠금", 70, 24, function()
+    f.dEquip:SetPoint("BOTTOMLEFT", 12, 12)
+    f.dLock = UI.button(d, "잠금", 76, 26, function()
         local entry = App.state.inventory.items[f.selected]
         if entry then Inventory.setLock(App.state, f.selected, not entry.lock) end
         UI.screens.bag.refresh(f)
     end)
     f.dLock:SetPoint("LEFT", f.dEquip, "RIGHT", 6, 0)
-    f.dSell = UI.button(d, "", 130, 24, function()
-        local gold, n = Inventory.alchemy(App.state, { f.selected })
+    f.dSell = UI.button(d, "", 132, 26, function()
+        local _, n = Inventory.alchemy(App.state, { f.selected })
         if n == 0 then WIH.Main.notice("잠근 아이템은 팔 수 없습니다.", C.bad) end
         f.selected = nil
         UI.screens.bag.refresh(f)
     end)
     f.dSell:SetPoint("LEFT", f.dLock, "RIGHT", 6, 0)
+    f.apply = UI.button(d, "지금 적용", 84, 26, function()
+        f.dirty = false
+        App.restartStage()
+        UI.screens.bag.refresh(f)
+    end)
+    f.apply:SetPoint("BOTTOMRIGHT", -12, 12)
+    f.apply.tooltip = { title = "지금 적용", lines = { "현재 스테이지를 처음부터 다시 시작해 바꾼 장비를 바로 적용합니다. 누르지 않으면 다음 스테이지부터 적용됩니다." } }
 
     -- 아래: 상자 보관함
     local chest = UI.panel(f, C.panel, true)
-    chest:SetPoint("BOTTOMLEFT", 10, 10)
-    chest:SetPoint("BOTTOMRIGHT", -10, 10)
+    chest:SetPoint("BOTTOMLEFT", 12, 10)
+    chest:SetPoint("BOTTOMRIGHT", -12, 10)
     chest:SetHeight(78)
     f.chestRows = {}
     for i, kind in ipairs(Chests.KINDS) do
         local row = CreateFrame("Frame", nil, chest)
-        row:SetSize(264, 24)
-        row:SetPoint("TOPLEFT", 10 + (i - 1) * 272, -6)
+        row:SetSize(296, 24)
+        row:SetPoint("TOPLEFT", 12 + (i - 1) * 308, -6)
         row.text = UI.text(row, 12, C.text)
         row.text:SetPoint("LEFT", 0, 0)
         row.open = UI.button(row, "열기", 48, 22, function()
@@ -205,11 +184,12 @@ local function create(parent)
             if not result then
                 WIH.Main.notice(why, C.bad)
             else
-                WIH.Main.notice(Chests.NAMES[kind] .. ": " .. lootText(result), C.good)
+                App.lastLoot = Chests.resultText(result)
+                WIH.Main.notice(Chests.NAMES[kind] .. ": " .. App.lastLoot, C.good)
             end
             UI.screens.bag.refresh(f)
         end)
-        row.open:SetPoint("LEFT", 132, 0)
+        row.open:SetPoint("LEFT", 140, 0)
         row.all = UI.button(row, "모두 열기", 70, 22, function()
             local s = App.state
             if not Chests.canOpenAll(s) then return WIH.Main.notice("모두 열기는 룬으로 해금합니다.", C.bad) end
@@ -219,7 +199,10 @@ local function create(parent)
                 if not result then break end
                 n, last = n + 1, result
             end
-            if n > 0 then WIH.Main.notice(Chests.NAMES[kind] .. " " .. n .. "개를 열었습니다. 마지막: " .. lootText(last), C.good) end
+            if n > 0 then
+                App.lastLoot = Chests.resultText(last)
+                WIH.Main.notice(Chests.NAMES[kind] .. " " .. n .. "개를 열었습니다. 마지막: " .. App.lastLoot, C.good)
+            end
             UI.screens.bag.refresh(f)
         end)
         row.all:SetPoint("LEFT", row.open, "RIGHT", 6, 0)
@@ -229,72 +212,59 @@ local function create(parent)
         f.chestRows[kind] = row
     end
     f.extra = UI.text(chest, 11, C.sub)
-    f.extra:SetPoint("BOTTOMLEFT", 10, 8)
+    f.extra:SetPoint("BOTTOMLEFT", 12, 8)
     f.claim = UI.button(chest, "임시 보관함에서 꺼내기", 150, 22, function()
         local n = Inventory.claimMail(App.state)
         WIH.Main.notice(n > 0 and (n .. "개를 가방으로 옮겼습니다.") or "가방에 빈칸이 없습니다.", n > 0 and C.good or C.bad)
         UI.screens.bag.refresh(f)
     end)
-    f.claim:SetPoint("BOTTOMRIGHT", -10, 4)
+    f.claim:SetPoint("BOTTOMRIGHT", -12, 4)
     f.acc = 0
     return f
 end
 
-local function heroRow(f, n)
-    local row = f.heroRows[n]
-    if row then return row end
-    row = UI.button(f.heroList.content, "", 126, 24, function(self)
+local function targetChip(f, n)
+    local b = f.targets[n]
+    if b then return b end
+    b = UI.chip(f, "", function(self)
         f.heroId = self.heroId
+        f.selected = nil
         UI.screens.bag.refresh(f)
     end)
-    row:SetPoint("TOPLEFT", 0, -(n - 1) * 26)
-    row.label:ClearAllPoints()
-    row.label:SetPoint("LEFT", 8, 0)
-    row.label:SetJustifyH("LEFT")
-    f.heroRows[n] = row
-    return row
+    f.targets[n] = b
+    return b
 end
 
 local function cell(f, n)
     local c = f.cells[n]
     if c then return c end
-    c = CreateFrame("Button", nil, f.grid.content)
-    c:SetSize(CELL, CELL)
+    c = UI.slot(f.grid.content, CELL)
     local col, rowIndex = (n - 1) % COLS, math.floor((n - 1) / COLS)
     c:SetPoint("TOPLEFT", col * (CELL + 4), -rowIndex * (CELL + 4))
-    c.bg = UI.fill(c, C.raised)
-    c.bg:SetAllPoints()
-    c.tex = c:CreateTexture(nil, "ARTWORK")
-    c.tex:SetPoint("TOPLEFT", 2, -2)
-    c.tex:SetPoint("BOTTOMRIGHT", -2, 2)
-    c.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    UI.border(c)
-    c.level = UI.text(c, 10, C.text, "RIGHT")
-    c.level:SetPoint("BOTTOMRIGHT", -3, 3)
     c.lock = UI.text(c, 10, C.warn)
     c.lock:SetPoint("TOPLEFT", 3, -3)
-    c:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    c:SetScript("OnClick", function(self, button)
+    c.onClick = function(_, button)
         local s = App.state
-        local entry = s.inventory.items[n]
-        if not entry then return end
+        local index = f.view[n]
+        if not index or not s.inventory.items[index] then return end
         if button == "RightButton" then
-            -- 오른쪽 클릭: 고른 영웅에게 바로 장착
-            local ok, why = Inventory.equip(s, selectedHero(f), n)
+            -- 오른쪽 클릭: 장착 대상에게 바로 장착
+            local ok, why = Inventory.equip(s, target(f), index)
             note(ok, why)
             if ok then f.dirty = true; f.selected = nil end
         else
-            f.selected = (f.selected ~= n) and n or nil
+            f.selected = (f.selected ~= index) and index or nil
         end
         UI.screens.bag.refresh(f)
-    end)
-    c:SetScript("OnEnter", function(self)
+    end
+    c.tooltip = function()
         local s = App.state
-        local entry = s and s.inventory.items[n]
+        local index = f.view[n]
+        local entry = s and index and s.inventory.items[index]
         local item = entry and Items.byId[entry.id]
-        if item then UI.showTooltip(self, UI.itemTip(item, entry, Inventory.equipped(s, selectedHero(f), item.slot))) end
-    end)
-    c:SetScript("OnLeave", UI.hideTooltip)
+        if not item then return nil end
+        return UI.itemTip(item, entry, Inventory.equipped(s, target(f), item.slot))
+    end
     f.cells[n] = c
     return c
 end
@@ -306,7 +276,7 @@ local function timerText(s, kind)
     local info = ChestTable.STAGE[Game.currentStageKey(s)]
     local minutes = info and (kind == "normal" and info.cool or info.bossCool) or 0
     local left = (1 - c.allowance) * minutes * 60
-    return string.format("다음 상자를 받을 수 있을 때까지 %d:%02d", math.floor(left / 60), math.floor(left % 60))
+    return string.format("다음 상자까지 %d:%02d", math.floor(left / 60), math.floor(left % 60))
 end
 
 local function paintChests(f)
@@ -335,49 +305,41 @@ local function paintChests(f)
     f.claim:SetShown(#s.mail > 0)
 end
 
+-- 영웅 화면에서 장비 칸을 눌러 넘어온 경우: 그 영웅과 그 칸의 종류로 맞춘다.
+local function onShow(f)
+    local t = UI.bagTarget
+    if t and App.state and App.state.heroes[t.heroId] then
+        f.heroId = t.heroId
+        f.filter = GROUP[t.slot] or "all"
+        f.selected = nil
+    end
+    UI.bagTarget = nil
+end
+
 local function refresh(f)
     local s = App.state
     if not s then return end
-    local heroId = selectedHero(f)
+    local heroId = target(f)
     local hero = Heroes.byId[heroId]
 
-    -- 영웅 목록: 편성한 영웅을 위에
-    local order, inParty = {}, {}
-    for _, id in ipairs(s.party) do order[#order + 1] = id; inParty[id] = true end
-    for _, h in ipairs(Heroes.list) do
-        if s.heroes[h.id] and not inParty[h.id] then order[#order + 1] = h.id end
+    -- 장착 대상: 편성한 영웅들(+ 편성 밖의 영웅이 대상이면 그 영웅)
+    local list, inParty = {}, {}
+    for _, id in ipairs(s.party) do list[#list + 1] = id; inParty[id] = true end
+    if not inParty[heroId] then list[#list + 1] = heroId end
+    local x = 76
+    for n, id in ipairs(list) do
+        local b = targetChip(f, n)
+        b.heroId = id
+        b:setText(Heroes.byId[id].name)
+        b:SetWidth((b.label:GetStringWidth() or 60) + 18)
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", x, -12)
+        b:setSelected(id == heroId)
+        b:Show()
+        x = x + b:GetWidth() + 5
     end
-    for n, id in ipairs(order) do
-        local row = heroRow(f, n)
-        row.heroId = id
-        row:setText(Heroes.byId[id].name)
-        row.label:SetTextColor(UI.rgb(inParty[id] and C.text or C.sub))
-        row:setSelected(id == heroId)
-        row:Show()
-    end
-    for i = #order + 1, #f.heroRows do f.heroRows[i]:Hide() end
-    f.heroList:setHeight(#order * 26)
-
-    f.eqTitle:SetText(hero.name .. "의 장비")
-    f.eqSub:SetText("주무기 " .. Items.TYPES[hero.main].name .. "  ·  보조무기 " .. Items.TYPES[hero.sub].name)
-    for slot, row in pairs(f.slots) do
-        local item = Inventory.equipped(s, heroId, slot)
-        if item then
-            row.icon.tex:SetTexture(UI.iconPath(item.icon))
-            row.icon:SetAlpha(1)
-            UI.setBorderColor(row.icon, gradeColor(item))
-            row.name:SetText(Items.name(item))
-            row.name:SetTextColor(UI.rgb(gradeColor(item)))
-        else
-            row.icon.tex:SetTexture(nil)
-            row.icon:SetAlpha(0.5)
-            UI.setBorderColor(row.icon, C.line)
-            row.name:SetText("비어 있음")
-            row.name:SetTextColor(UI.rgb(C.dim))
-        end
-        row.off:SetShown(item ~= nil)
-    end
-    f.applyHint:SetText(f.dirty and "바꾼 장비는 다음 스테이지부터 적용됩니다." or "")
+    for i = #list + 1, #f.targets do f.targets[i]:Hide() end
+    for _, b in ipairs(f.filters) do b:setSelected(b.id == f.filter) end
 
     -- 인벤토리
     local cap, count = Inventory.capacity(s), Inventory.count(s)
@@ -387,28 +349,34 @@ local function refresh(f)
     f.buy:setText(cost and ("칸 구매 " .. UI.number(cost) .. " G") or "칸 최대")
     f.buy:setEnabled(cost ~= nil and s.gold >= cost)
     if f.selected and not s.inventory.items[f.selected] then f.selected = nil end
-    for n = 1, cap do
+
+    local view = {}
+    for index, entry in ipairs(s.inventory.items) do
+        local item = Items.byId[entry.id]
+        if item and passes(f, item) then view[#view + 1] = index end
+    end
+    f.view = view
+    local shown = f.filter == "all" and cap or #view       -- 전체 보기에서는 빈칸까지 보여 용량을 알 수 있게 한다
+    for n = 1, shown do
         local c = cell(f, n)
-        local entry = s.inventory.items[n]
+        local index = view[n]
+        local entry = index and s.inventory.items[index]
         local item = entry and Items.byId[entry.id]
         if item then
-            c.tex:SetTexture(UI.iconPath(item.icon))
-            c.tex:Show()
-            c.level:SetText(tostring(item.level))
+            c:setIcon(item.icon, gradeColor(item))
+            c.corner:SetText(tostring(item.level))
             c.lock:SetText(entry.lock and "잠" or "")
-            UI.setBorderColor(c, gradeColor(item))
             c.tex:SetDesaturated(not Items.usableBy(item, heroId))
         else
-            c.tex:Hide()
-            c.level:SetText("")
+            c:setIcon(nil, C.line)
+            c.corner:SetText("")
             c.lock:SetText("")
-            UI.setBorderColor(c, C.line, 0.6)
         end
-        c.bg:SetColorTexture(UI.rgb(n == f.selected and C.press or C.raised))
+        c.bg:SetColorTexture(UI.rgb((index and index == f.selected) and C.press or C.well))
         c:Show()
     end
-    for i = cap + 1, #f.cells do f.cells[i]:Hide() end
-    f.grid:setHeight(math.ceil(cap / COLS) * (CELL + 4))
+    for i = shown + 1, #f.cells do f.cells[i]:Hide() end
+    f.grid:setHeight(math.ceil(shown / COLS) * (CELL + 4))
 
     -- 상세
     local entry = f.selected and s.inventory.items[f.selected]
@@ -417,6 +385,7 @@ local function refresh(f)
     f.dIcon:SetShown(has); f.dName:SetShown(has); f.dMeta:SetShown(has); f.dBody:SetShown(has)
     f.dEquip:SetShown(has); f.dLock:SetShown(has); f.dSell:SetShown(has)
     f.dEmpty:SetShown(not has)
+    f.apply:SetShown(f.dirty == true)
     if has then
         f.dIcon.tex:SetTexture(UI.iconPath(item.icon))
         UI.setBorderColor(f.dIcon, gradeColor(item))
@@ -424,17 +393,21 @@ local function refresh(f)
         f.dName:SetTextColor(UI.rgb(gradeColor(item)))
         f.dMeta:SetText(Items.gradeName(item) .. "  ·  " .. Items.SLOT_NAMES[item.slot] .. "  ·  아이템 레벨 " .. item.level)
         local lines = {}
-        for _, mod in ipairs(item.mods) do lines[#lines + 1] = Items.modText(mod) end
+        for _, mod in ipairs(item.mods) do
+            lines[#lines + 1] = (mod.base and "|cffe8e9ec" or "") .. Items.modText(mod) .. (mod.base and "|r" or "")
+        end
         local cur = Inventory.equipped(s, heroId, item.slot)
-        if cur then
-            local curLines = {}
-            for _, mod in ipairs(cur.mods) do curLines[#curLines + 1] = Items.modText(mod) end
-            lines[#lines + 1] = "|cff6b6e75지금 낀 것: " .. Items.name(cur) .. " (" .. Items.gradeName(cur) .. ") — " .. table.concat(curLines, ", ") .. "|r"
+        if cur and Items.usableBy(item, heroId) then
+            lines[#lines + 1] = ""
+            lines[#lines + 1] = "|cff666b74" .. hero.name .. "이(가) 지금 낀 것: " .. Items.name(cur) .. " [" .. Items.gradeName(cur) .. ", 레벨 " .. cur.level .. "]"
+            for _, mod in ipairs(cur.mods) do lines[#lines + 1] = "  " .. Items.modText(mod) end
+            lines[#lines] = lines[#lines] .. "|r"
         end
         f.dBody:SetText(table.concat(lines, "\n"))
         local usable = Items.usableBy(item, heroId)
         f.dEquip:setEnabled(usable)
-        f.dEquip.tooltip = usable and nil or { title = "장착할 수 없음", lines = { hero.name .. "이(가) 쓰는 종류가 아닙니다." } }
+        f.dEquip.tooltip = usable and { title = "장착", lines = { hero.name .. "에게 낍니다. 끼고 있던 것은 가방으로 돌아옵니다." } }
+            or { title = "장착할 수 없음", lines = { hero.name .. "이(가) 쓰는 종류가 아닙니다." } }
         f.dLock:setText(entry.lock and "잠금 해제" or "잠금")
         f.dSell:setText("팔기 +" .. UI.number(Inventory.alchemyValue(s, item)) .. " G")
         f.dSell:setEnabled(not entry.lock)
@@ -450,4 +423,4 @@ local function update(f, elapsed)
     if App.state then paintChests(f) end
 end
 
-UI.screens.bag = { label = "가방", order = 3, create = create, refresh = refresh, update = update }
+UI.screens.bag = { label = "가방", order = 2, create = create, refresh = refresh, update = update, onShow = onShow }

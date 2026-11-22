@@ -238,6 +238,16 @@ function B:hit(src, dst, spec)
     return self:receive(src, dst, dmg, elem, spec, crit)
 end
 
+-- 방어도에 의한 물리 피해 감소율 [원작]: A² / (A² + (14 × 스테이지 레벨 + 12) × (A + 0.4 × 피해)), 상한 근접 85% / 원거리 75%
+function Battle.armorReduction(armor, dmg, stageLevel, melee)
+    if armor <= 0 then return 0 end
+    local k = 14 * stageLevel + 12
+    local reduction = armor * armor / (armor * armor + k * (armor + 0.4 * dmg))
+    local cap = melee and Stats.CAP_ARMOR_MELEE or Stats.CAP_ARMOR_RANGED
+    if reduction > cap then reduction = cap end
+    return reduction
+end
+
 -- 대상 쪽 계산: 대신 받기 → 회피 → 막기 → 방어도/저항 → 피해 감소 → 흡수 → 최소 1 → 보호막 → 체력
 function B:receive(src, dst, dmg, elem, spec, crit)
     if not dst.alive then return 0 end
@@ -264,14 +274,7 @@ function B:receive(src, dst, dmg, elem, spec, crit)
     end
 
     if physical then
-        local armor = dst:get("Armor")
-        if armor > 0 then
-            local k = 14 * self.stageLevel + 12
-            local reduction = armor * armor / (armor * armor + k * (armor + 0.4 * dmg))
-            local cap = dst.melee and Stats.CAP_ARMOR_MELEE or Stats.CAP_ARMOR_RANGED
-            if reduction > cap then reduction = cap end
-            dmg = dmg * (1 - reduction)
-        end
+        dmg = dmg * (1 - Battle.armorReduction(dst:get("Armor"), dmg, self.stageLevel, dst.melee))
     else
         local res = dst:get(elem .. "Resistance")
         if elem ~= "Chaos" then res = res + dst:get("AllElementalResistance") end

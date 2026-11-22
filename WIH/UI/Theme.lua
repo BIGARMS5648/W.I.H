@@ -8,23 +8,26 @@
 local _, WIH = ...
 local UI = WIH.module("UI")
 
+-- 색은 시안(docs/design/mockups/ui-01-strip-and-menu.png)의 값이다.
 UI.C = {
-    bg     = { 0.070, 0.072, 0.080 },
-    panel  = { 0.100, 0.104, 0.115 },
-    raised = { 0.135, 0.140, 0.155 },
-    hover  = { 0.175, 0.180, 0.200 },
-    press  = { 0.215, 0.220, 0.245 },
-    line   = { 0.215, 0.220, 0.240 },
-    text   = { 0.920, 0.920, 0.930 },
-    sub    = { 0.640, 0.650, 0.680 },
-    dim    = { 0.420, 0.430, 0.460 },
-    good   = { 0.440, 0.720, 0.500 },
-    bad    = { 0.820, 0.370, 0.350 },
-    warn   = { 0.850, 0.690, 0.370 },
-    shield = { 0.560, 0.700, 0.860 },
-    exp    = { 0.520, 0.480, 0.720 },
-    Alliance = { 0.360, 0.520, 0.740 },
-    Horde    = { 0.700, 0.270, 0.250 },
+    bg     = { 0.071, 0.075, 0.086 },    -- 창 바탕
+    panel  = { 0.098, 0.106, 0.122 },    -- 패널
+    raised = { 0.129, 0.141, 0.161 },    -- 버튼, 선택된 줄
+    hover  = { 0.165, 0.176, 0.200 },
+    press  = { 0.200, 0.212, 0.240 },
+    well   = { 0.082, 0.090, 0.102 },    -- 아이콘 칸의 바탕
+    line   = { 0.180, 0.192, 0.220 },    -- 얇은 선
+    line2  = { 0.227, 0.243, 0.275 },    -- 조금 밝은 선(아이콘 칸, 버튼)
+    text   = { 0.910, 0.914, 0.925 },
+    sub    = { 0.616, 0.635, 0.667 },
+    dim    = { 0.400, 0.420, 0.455 },
+    good   = { 0.435, 0.690, 0.498 },
+    bad    = { 0.812, 0.373, 0.345 },
+    warn   = { 0.824, 0.651, 0.353 },
+    shield = { 0.561, 0.698, 0.859 },
+    exp    = { 0.541, 0.518, 0.769 },
+    Alliance = { 0.365, 0.518, 0.722 },
+    Horde    = { 0.706, 0.282, 0.247 },
 }
 
 UI.ELEMENT_COLORS = {
@@ -295,6 +298,193 @@ function UI.number(v)
     local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
     if out:sub(1, 1) == "," then out = out:sub(2) end
     return sign .. out
+end
+
+------------------------------------------------------------------------
+-- 시안의 부품들
+------------------------------------------------------------------------
+
+-- 위쪽 탭: 글자 + 선택되면 아래에 강조색 줄
+function UI.tab(parent, label, onClick)
+    local b = CreateFrame("Button", nil, parent)
+    b.label = UI.text(b, 13, UI.C.sub, "CENTER")
+    b.label:SetPoint("CENTER")
+    b.label:SetText(label)
+    b:SetSize(math.max(44, (b.label:GetStringWidth() or 30) + 30), 44)
+    b.line = UI.fill(b, UI.accent(), "OVERLAY")
+    b.line:SetPoint("BOTTOMLEFT", 12, 0)
+    b.line:SetPoint("BOTTOMRIGHT", -12, 0)
+    b.line:SetHeight(2)
+    b.line:Hide()
+    function b:setSelected(v)
+        self.selected = v and true or false
+        self.line:SetColorTexture(rgb(UI.accent()))
+        self.line:SetShown(self.selected)
+        self.label:SetTextColor(rgb(self.selected and UI.C.text or (self.over and UI.C.text or UI.C.sub)))
+    end
+    b:SetScript("OnEnter", function(self) self.over = true; self:setSelected(self.selected) end)
+    b:SetScript("OnLeave", function(self) self.over = false; self:setSelected(self.selected) end)
+    b:SetScript("OnClick", function(self)
+        local ok, err = pcall(onClick, self)
+        if not ok then UI.reportError(err) end
+    end)
+    return b
+end
+
+-- 작은 선택 칩(필터)
+function UI.chip(parent, label, onClick)
+    local b = UI.button(parent, label, 10, 22, onClick)
+    b.label:SetFont(STANDARD_TEXT_FONT or "Fonts\\2002.TTF", 11, "")
+    b:SetWidth(math.max(36, (b.label:GetStringWidth() or 20) + 18))
+    function b:paint()
+        if self.selected then
+            self.bg:SetColorTexture(rgb(UI.C.raised))
+            self.label:SetTextColor(rgb(UI.C.text))
+            UI.setBorderColor(self, UI.C.line2)
+        else
+            self.bg:SetColorTexture(rgb(self.over and UI.C.panel or UI.C.bg))
+            self.label:SetTextColor(rgb(self.enabled and UI.C.sub or UI.C.dim))
+            UI.setBorderColor(self, UI.C.line)
+        end
+    end
+    b:paint()
+    return b
+end
+
+-- 나란히 붙은 선택 묶음: items = { {id, label}, ... }, onPick(id)
+function UI.segment(parent, items, width, onPick)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(width, 28)
+    UI.border(f)
+    f.buttons = {}
+    local w = width / #items
+    for i, it in ipairs(items) do
+        local b = CreateFrame("Button", nil, f)
+        b:SetSize(w, 28)
+        b:SetPoint("LEFT", (i - 1) * w, 0)
+        b.bg = UI.fill(b, UI.C.raised)
+        b.bg:SetPoint("TOPLEFT", 1, -1)
+        b.bg:SetPoint("BOTTOMRIGHT", -1, 1)
+        b.label = UI.text(b, 12, UI.C.sub, "CENTER")
+        b.label:SetPoint("CENTER")
+        b.label:SetText(it[2])
+        b.id = it[1]
+        b:SetScript("OnClick", function()
+            f:pick(it[1])
+            local ok, err = pcall(onPick, it[1])
+            if not ok then UI.reportError(err) end
+        end)
+        if i > 1 then
+            local sep = UI.fill(f, UI.C.line, "ARTWORK")
+            sep:SetSize(1, 28)
+            sep:SetPoint("LEFT", (i - 1) * w, 0)
+        end
+        f.buttons[i] = b
+    end
+    function f:pick(id)
+        self.value = id
+        for _, b in ipairs(self.buttons) do
+            local on = b.id == id
+            b.bg:SetShown(on)
+            b.label:SetTextColor(rgb(on and UI.C.text or UI.C.sub))
+        end
+    end
+    f:pick(items[1][1])
+    return f
+end
+
+-- 레벨 점: 세로 막대 n개 중 앞의 몇 개가 채워진다
+function UI.pips(parent, count)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(count * 6 - 2, 12)
+    f.items = {}
+    for i = 1, count do
+        local t = UI.fill(f, UI.C.line, "ARTWORK")
+        t:SetSize(4, 12)
+        t:SetPoint("LEFT", (i - 1) * 6, 0)
+        f.items[i] = t
+    end
+    function f:set(n)
+        for i, t in ipairs(self.items) do
+            t:SetColorTexture(rgb(i <= n and UI.C.text or UI.C.line))
+        end
+    end
+    return f
+end
+
+-- 목록의 한 줄: 선택되면 바탕이 밝아지고 왼쪽에 강조색 줄이 생긴다
+function UI.listRow(parent, width, height, onClick)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(width, height)
+    b.bg = UI.fill(b, UI.C.raised)
+    b.bg:SetAllPoints()
+    b.bg:Hide()
+    b.bar = UI.fill(b, UI.accent(), "ARTWORK")
+    b.bar:SetPoint("TOPLEFT")
+    b.bar:SetPoint("BOTTOMLEFT")
+    b.bar:SetWidth(2)
+    b.bar:Hide()
+    function b:setSelected(v)
+        self.selected = v and true or false
+        self.bar:SetColorTexture(rgb(UI.accent()))
+        self.bar:SetShown(self.selected)
+        self.bg:SetShown(self.selected or self.over == true)
+        self.bg:SetColorTexture(rgb(self.selected and UI.C.raised or UI.C.panel))
+    end
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetScript("OnEnter", function(self)
+        self.over = true
+        self:setSelected(self.selected)
+        if self.tooltip then UI.showTooltip(self, self.tooltip) end
+    end)
+    b:SetScript("OnLeave", function(self) self.over = false; self:setSelected(self.selected); UI.hideTooltip() end)
+    b:SetScript("OnClick", function(self, button)
+        local ok, err = pcall(onClick, self, button)
+        if not ok then UI.reportError(err) end
+    end)
+    return b
+end
+
+-- 아이콘 칸(장비, 스킬): 어두운 바탕 + 얇은 선 + 아이콘
+function UI.slot(parent, size)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(size, size)
+    b.bg = UI.fill(b, UI.C.well)
+    b.bg:SetAllPoints()
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetPoint("TOPLEFT", 2, -2)
+    b.tex:SetPoint("BOTTOMRIGHT", -2, 2)
+    b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    UI.border(b, UI.C.line2)
+    b.corner = UI.text(b, 10, UI.C.sub, "RIGHT")
+    b.corner:SetPoint("BOTTOMRIGHT", -3, 3)
+    b.center = UI.text(b, 10, UI.C.dim, "CENTER")
+    b.center:SetPoint("CENTER")
+    function b:setIcon(name, borderColor)
+        if name then
+            self.tex:SetTexture(UI.iconPath(name))
+            self.tex:Show()
+        else
+            self.tex:Hide()
+        end
+        UI.setBorderColor(self, borderColor or UI.C.line2)
+    end
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetScript("OnEnter", function(self) if self.tooltip then UI.showTooltip(self, self.tooltip) end end)
+    b:SetScript("OnLeave", UI.hideTooltip)
+    b:SetScript("OnClick", function(self, button)
+        if not self.onClick then return end
+        local ok, err = pcall(self.onClick, self, button)
+        if not ok then UI.reportError(err) end
+    end)
+    return b
+end
+
+-- 작은 제목 글자(구역 이름)
+function UI.label(parent, text)
+    local fs = UI.text(parent, 11, UI.C.dim)
+    fs:SetText(text or "")
+    return fs
 end
 
 function UI.reportError(err)

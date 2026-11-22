@@ -207,6 +207,16 @@ function Chests.materialName(id)
     return (MATERIAL_KIND[def.kind] or def.kind) .. " (" .. Items.GRADES[def.grade].name .. ")"
 end
 
+-- 상자를 연 결과의 한 줄 표기
+function Chests.resultText(result)
+    if not result then return "" end
+    if result.item then
+        local where = result.where == "mail" and " (가방이 가득 차 임시 보관함으로)" or ""
+        return Items.name(result.item) .. " [" .. Items.gradeName(result.item) .. "]" .. where
+    end
+    return Chests.materialName(result.material)
+end
+
 -- 저장 데이터 검증
 function Chests.validate(state, notes)
     Chests.ensure(state)

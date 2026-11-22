@@ -155,6 +155,13 @@ local function treeValid(hero, h)
 end
 Game.treeValid = treeValid
 
+-- 그 티어의 노드에 투자할 수 있는지(아래 티어들에 투자한 포인트가 티어 값 이상인지)
+function Game.tierOpen(state, heroId, tier)
+    local hero, h = Heroes.byId[heroId], state.heroes[heroId]
+    if not hero or not h then return false end
+    return pointsBelow(hero, h, tier) >= tier
+end
+
 function Game.investActive(state, heroId, skillId)
     local hero, h = Heroes.byId[heroId], state.heroes[heroId]
     if not hero or not h then return fail("해금하지 않은 영웅입니다.") end
@@ -246,18 +253,23 @@ end
 -- 전투용 편성 정보
 ------------------------------------------------------------------------
 
+-- 영웅 한 명을 전투에 넣을 때 쓰는 정보(장착 스킬, 패시브, 장비 시트). 편성과 전투력 계산이 같이 쓴다.
+function Game.heroEntry(state, heroId)
+    local h = state.heroes[heroId]
+    local slots = Game.skillSlots(state)
+    local skills = {}
+    for i = 1, math.min(#h.bar, slots) do
+        local id = h.bar[i]
+        skills[#skills + 1] = { id, h.active[id] or 1 }
+    end
+    return { heroId = heroId, form = h.form, level = h.level, passivePoints = h.passive, skills = skills,
+        heroState = h, gear = WIH.Inventory.gearSheet(state, heroId) }
+end
+
 function Game.buildParty(state)
     local party = {}
-    local slots = Game.skillSlots(state)
     for rank, heroId in ipairs(state.party) do
-        local h = state.heroes[heroId]
-        local skills = {}
-        for i = 1, math.min(#h.bar, slots) do
-            local id = h.bar[i]
-            skills[#skills + 1] = { id, h.active[id] or 1 }
-        end
-        party[rank] = { heroId = heroId, form = h.form, level = h.level, passivePoints = h.passive, skills = skills,
-            heroState = h, gear = WIH.Inventory.gearSheet(state, heroId) }
+        party[rank] = Game.heroEntry(state, heroId)
     end
     return party
 end

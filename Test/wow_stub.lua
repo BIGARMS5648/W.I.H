@@ -77,7 +77,14 @@ function methods:GetVerticalScrollRange() return 1000 end
 function methods:SetScrollChild(c) self.__scrollChild = c end
 function methods:SetTexture(path) self.__texture = path; return true end
 function methods:GetTexture() return self.__texture end
-function methods:GetModelFileID() return nil end
+-- 모델: Stub.modelsWork가 참이면 불러와진 것으로, Stub.badModels[번호]가 있으면 그 번호만 실패로 친다.
+function methods:SetCreature(id) self.__creature = id end
+function methods:ClearModel() self.__creature = nil end
+function methods:GetModelFileID()
+    if not Stub.modelsWork or not self.__creature then return nil end
+    if Stub.badModels and Stub.badModels[self.__creature] then return nil end
+    return 100000 + self.__creature
+end
 function methods:GetEffectiveScale() return 1 end
 function methods:GetScale() return 1 end
 function methods:GetAlpha() return 1 end

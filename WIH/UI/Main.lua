@@ -1,18 +1,16 @@
--- 본 창: 상단 띠, 왼쪽 메뉴, 화면 전환. 이동과 크기 조정을 지원하고 위치·크기를 저장한다.
+-- 메뉴 창: 영웅, 가방, 편성, 스테이지, 성장, 기록, 설정. 사냥 띠와는 별개의 창이고 필요할 때만 연다.
+-- 위쪽 줄에 탭이 있고(끌어서 이동), 아래에 알림 줄이 있다. 크기 조정과 위치·크기 저장을 지원한다.
 
 local _, WIH = ...
 local UI = WIH.module("UI")
 local App = WIH.module("App")
-local Game = WIH.module("Game")
-local Tables = WIH.module("Tables")
-local Dungeons = WIH.module("Dungeons")
 local Main = WIH.module("Main")
 
 UI.screens = UI.screens or {}       -- [id] = { label, order, create(parent) → frame, refresh(frame), update(frame, elapsed), onShow, onHide }
-local NAV_WIDTH, TOP_HEIGHT = 124, 38
-local MIN_W, MIN_H, DEF_W, DEF_H = 980, 610, 980, 640
+local HEAD, FOOT = 44, 22
+local MIN_W, MIN_H, DEF_W, DEF_H = 960, 600, 960, 600
 
-local frame, content, navButtons, topStage, topGold, noticeText
+local frame, content, tabs, goldText, noticeText
 local built = {}
 local current
 Main.built = built                  -- 화면 ID → 만들어진 프레임(검사와 진단용)
@@ -23,7 +21,7 @@ local function layoutSaved()
     return WIH_UI
 end
 
-local function navOrder()
+local function tabOrder()
     local list = {}
     for id, s in pairs(UI.screens) do
         if s.order then list[#list + 1] = id end
@@ -35,30 +33,13 @@ end
 local function updateTop()
     if not frame then return end
     local state = App.state
-    if not state then
-        topStage:SetText("")
-        topGold:SetText("")
-        return
-    end
-    local sec = Dungeons.sections[state.stage.section]
-    local text = Tables.DIFFICULTY_NAMES[state.stage.difficulty] .. "  ·  " .. (sec and sec.name or "")
-    local runner = App.session and App.session.runner
-    if runner and runner.raid then
-        text = Tables.DIFFICULTY_NAMES[runner.difficulty] .. "  ·  " .. runner.raid.name .. " 레이드  ·  보스 " .. runner.wave .. "/" .. runner.waves
-    elseif runner then
-        if runner.phase == "boss" and runner.boss then
-            text = text .. "  ·  보스"
-        else
-            text = text .. "  ·  웨이브 " .. runner.wave .. "/" .. runner.waves
-        end
-    end
-    topStage:SetText(text)
-    topGold:SetText(UI.number(math.floor(state.gold)) .. " G")
+    goldText:SetText(state and (UI.number(math.floor(state.gold)) .. " G") or "")
 end
 
 function Main.show(id)
     if not frame then Main.create() end
     if not App.state then id = "setup" end
+    if id == "setup" and App.state then id = "heroes" end
     local screen = UI.screens[id]
     if not screen then return end
     if current and current ~= id and built[current] then
@@ -75,8 +56,8 @@ function Main.show(id)
     built[id]:Show()
     if screen.onShow then screen.onShow(built[id]) end
     if screen.refresh then screen.refresh(built[id]) end
-    for navId, b in pairs(navButtons) do
-        b:setSelected(navId == id)
+    for tabId, b in pairs(tabs) do
+        b:setSelected(tabId == id)
         b:SetShown(App.state ~= nil)
     end
     updateTop()
@@ -105,14 +86,14 @@ function Main.create()
     if tonumber(saved.x) and tonumber(saved.y) then
         frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", saved.x, saved.y)
     else
-        frame:SetPoint("CENTER")
+        frame:SetPoint("CENTER", 0, 60)
     end
     frame:SetFrameStrata("HIGH")
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:SetResizable(true)
-    if frame.SetResizeBounds then frame:SetResizeBounds(MIN_W, MIN_H, 1800, 1200) end
+    if frame.SetResizeBounds then frame:SetResizeBounds(MIN_W, MIN_H, 1500, 950) end
     frame:EnableMouse(true)
     frame:Hide()
     frame.bg = UI.fill(frame, UI.C.bg)
@@ -125,54 +106,42 @@ function Main.create()
         s.x, s.y = frame:GetLeft(), frame:GetTop()
     end
 
-    -- 상단 띠(끌어서 이동)
+    -- 위쪽 줄: 이름, 탭, 골드, 닫기(끌어서 이동)
     local top = UI.panel(frame, UI.C.panel)
     top:SetPoint("TOPLEFT", 1, -1)
     top:SetPoint("TOPRIGHT", -1, -1)
-    top:SetHeight(TOP_HEIGHT)
+    top:SetHeight(HEAD)
     top:EnableMouse(true)
     top:RegisterForDrag("LeftButton")
     top:SetScript("OnDragStart", function() frame:StartMoving() end)
     top:SetScript("OnDragStop", function() frame:StopMovingOrSizing(); savePlace() end)
-    local title = UI.text(top, 14, UI.C.text)
-    title:SetPoint("LEFT", 14, 0)
-    title:SetText("W.I.H")
-    topStage = UI.text(top, 12, UI.C.sub)
-    topStage:SetPoint("LEFT", title, "RIGHT", 18, 0)
-    local close = UI.button(top, "닫기", 52, 22, function() frame:Hide() end)
-    close:SetPoint("RIGHT", -8, 0)
-    topGold = UI.text(top, 13, UI.C.warn, "RIGHT")
-    topGold:SetPoint("RIGHT", close, "LEFT", -14, 0)
+    local brand = UI.text(top, 14, UI.C.text)
+    brand:SetPoint("LEFT", 16, 0)
+    brand:SetText("W.I.H")
+    tabs = {}
+    local x = 76
+    for _, id in ipairs(tabOrder()) do
+        local b = UI.tab(top, UI.screens[id].label, function() Main.show(id) end)
+        b:SetPoint("LEFT", x, 0)
+        tabs[id] = b
+        x = x + b:GetWidth()
+    end
+    local close = UI.button(top, "닫기", 48, 24, function() frame:Hide() end)
+    close:SetPoint("RIGHT", -10, 0)
+    goldText = UI.text(top, 13, UI.C.warn, "RIGHT")
+    goldText:SetPoint("RIGHT", close, "LEFT", -16, 0)
     local line = UI.fill(frame, UI.C.line, "BORDER")
     line:SetPoint("TOPLEFT", top, "BOTTOMLEFT")
     line:SetPoint("TOPRIGHT", top, "BOTTOMRIGHT")
     line:SetHeight(1)
 
-    -- 왼쪽 메뉴
-    local nav = UI.panel(frame, UI.C.panel)
-    nav:SetPoint("TOPLEFT", top, "BOTTOMLEFT", 0, -1)
-    nav:SetPoint("BOTTOMLEFT", 1, 1)
-    nav:SetWidth(NAV_WIDTH)
-    navButtons = {}
-    local y = -10
-    for _, id in ipairs(navOrder()) do
-        local b = UI.button(nav, UI.screens[id].label, NAV_WIDTH - 20, 30, function() Main.show(id) end)
-        b:SetPoint("TOPLEFT", 10, y)
-        navButtons[id] = b
-        y = y - 36
-    end
-    local navLine = UI.fill(frame, UI.C.line, "BORDER")
-    navLine:SetPoint("TOPLEFT", nav, "TOPRIGHT")
-    navLine:SetPoint("BOTTOMLEFT", nav, "BOTTOMRIGHT")
-    navLine:SetWidth(1)
-
     -- 아래 알림 줄
     local foot = UI.panel(frame, UI.C.panel)
-    foot:SetPoint("BOTTOMLEFT", nav, "BOTTOMRIGHT", 1, 0)
+    foot:SetPoint("BOTTOMLEFT", 1, 1)
     foot:SetPoint("BOTTOMRIGHT", -1, 1)
-    foot:SetHeight(22)
+    foot:SetHeight(FOOT)
     noticeText = UI.text(foot, 11, UI.C.sub)
-    noticeText:SetPoint("LEFT", 10, 0)
+    noticeText:SetPoint("LEFT", 12, 0)
     noticeText:SetPoint("RIGHT", -24, 0)
 
     -- 크기 조정 손잡이
@@ -194,8 +163,8 @@ function Main.create()
     end)
 
     content = CreateFrame("Frame", nil, frame)
-    content:SetPoint("TOPLEFT", nav, "TOPRIGHT", 1, 0)
-    content:SetPoint("BOTTOMRIGHT", foot, "TOPRIGHT", 0, 1)
+    content:SetPoint("TOPLEFT", 1, -HEAD - 2)
+    content:SetPoint("BOTTOMRIGHT", -1, FOOT + 2)
     if content.SetClipsChildren then content:SetClipsChildren(true) end
 
     local acc = 0
@@ -219,7 +188,7 @@ function Main.create()
         end
     end)
     frame:SetScript("OnShow", function()
-        Main.show(current or (App.state and "battle" or "setup"))
+        Main.show(current or (App.state and "heroes" or "setup"))
     end)
     frame:SetScript("OnHide", function()
         if current and built[current] and UI.screens[current].onHide then UI.screens[current].onHide(built[current]) end
@@ -234,6 +203,12 @@ function Main.toggle()
     if frame:IsShown() then frame:Hide() else frame:Show() end
 end
 
+function Main.open(id)
+    if not frame then Main.create() end
+    if not frame:IsShown() then frame:Show() end
+    if id then Main.show(id) end
+end
+
 function Main.isShown()
     return frame ~= nil and frame:IsShown()
 end
@@ -241,11 +216,12 @@ end
 -- 상태가 바뀌면 보이는 화면을 다시 그린다.
 App.watchers[#App.watchers + 1] = function(tag)
     if tag == "reset" or tag == "newGame" or tag == "restore" then
-        if frame and frame:IsShown() then Main.show(App.state and "battle" or "setup") end
+        if tag == "reset" then Main.open() end      -- 초기화하면 진영 선택부터 다시 해야 하므로 창을 연다
+        if frame and frame:IsShown() then Main.show(App.state and "heroes" or "setup") end
         return
     end
     if tag == "loaded" then
-        print("|cffc0c0c0W.I.H|r: /wih 를 입력하면 창이 열립니다.")
+        print("|cffc0c0c0W.I.H|r: /wih 를 입력하면 메뉴 창이 열립니다." .. (App.state and "" or " 처음이면 진영과 첫 영웅을 고릅니다."))
         if App.loadInfo and App.loadInfo.status == "fixed" then
             print("|cffc0c0c0W.I.H|r: 저장 데이터의 일부를 바로잡았습니다. 설정 화면에서 내용을 볼 수 있습니다.")
         elseif App.loadInfo and App.loadInfo.status == "newer" then
