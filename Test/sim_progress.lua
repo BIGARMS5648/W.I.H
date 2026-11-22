@@ -46,18 +46,56 @@ local function invest()
     end
 end
 
-local function buyRunes()
-    for _ = 1, 30 do
-        local best, bestCost
-        for key, node in pairs(RuneData.nodes) do
-            if Runes.canBuy(s, key) then
-                local cost = Runes.nextCost(s, key)
-                -- 편성 칸으로 가는 길목과 효과가 있는 룬만 산다.
-                if (not Runes.INACTIVE[node.stat]) and (not bestCost or cost < bestCost) then best, bestCost = key, cost end
+-- 룬: 편성 칸·스킬 칸으로 가는 길의 노드를 먼저 산다. 그 다음 목표 비용의 10% 미만인 룬만 산다(목표를 위해 모은다).
+local GOALS = {}
+for key, node in pairs(RuneData.nodes) do
+    if node.stat == "UnlockArrangeSlotCount" or node.stat == "UnlockSkillSlotCount" then GOALS[#GOALS + 1] = key end
+end
+local function pathTo(key)
+    local path = {}
+    while key do table.insert(path, 1, key); key = RuneData.nodes[key].parent end
+    return path
+end
+-- 골드는 따지지 않고 지금 올릴 수 있는 룬인지
+local function reachable(key)
+    local node = RuneData.nodes[key]
+    if not Runes.treeUnlocked(s) or Runes.level(s, key) >= node.max then return false end
+    return not node.parent or Runes.level(s, node.parent) >= (node.req or 1)
+end
+local function nextGoal()
+    local best, bestCost
+    for _, goal in ipairs(GOALS) do
+        for _, key in ipairs(pathTo(goal)) do
+            local node = RuneData.nodes[key]
+            local need = (key == goal) and node.max or (node.req or 1)
+            if Runes.level(s, key) < need then
+                if reachable(key) then
+                    local cost = Runes.nextCost(s, key)
+                    if not bestCost or cost < bestCost then best, bestCost = key, cost end
+                end
+                break
             end
         end
-        if not best then return end
-        Runes.buy(s, best)
+    end
+    return best, bestCost
+end
+
+local function buyRunes()
+    for _ = 1, 50 do
+        local goal, goalCost = nextGoal()
+        if goal and s.gold >= goalCost then
+            Runes.buy(s, goal)
+        else
+            local best, bestCost
+            for key, node in pairs(RuneData.nodes) do
+                if Runes.canBuy(s, key) and not Runes.INACTIVE[node.stat] then
+                    local cost = Runes.nextCost(s, key)
+                    if (not goalCost or cost < goalCost * 0.1) and (not bestCost or cost < bestCost) then best, bestCost = key, cost end
+                end
+            end
+            if not best or s.gold < bestCost then return end
+            Runes.buy(s, best)
+        end
     end
 end
 
@@ -107,22 +145,9 @@ local function loot()
     Inventory.alchemy(s, all)
 end
 
--- 전멸이 이어지면 한 단계 내려가고, 클리어가 이어지면 가장 높이 열린 곳으로 올라간다.
+-- 스테이지 선택은 진행 설정(실패하면 앞 스테이지로, 클리어하면 다음으로)에 맡긴다. 증표가 있으면 레이드에 도전한다.
 local function chooseStage()
     if s.stage.raidKey then return end
-    if recentFails >= 3 and recentClears == 0 then
-        local prev = Game.previousStage(Game.currentStageKey(s))
-        while prev and Tables.STAGES[prev].actBoss do prev = Game.previousStage(prev) end
-        if prev then
-            Game.selectStage(s, math.floor(prev / 1000), prev % 1000)
-            s.settings.repeatMode = true
-            sess:startStage()
-        end
-    elseif recentClears >= 3 and recentFails == 0 and s.settings.repeatMode then
-        s.settings.repeatMode = false
-    end
-    recentFails, recentClears = 0, 0
-    -- 레이드: 증표가 있고 열려 있으면 도전
     local d = s.stage.difficulty
     local act = math.floor(s.stage.section / 100)
     if Game.canStartRaid(s, d, act) and (s.stage.cleared[Raids.key(d, act)] or 0) == 0 then

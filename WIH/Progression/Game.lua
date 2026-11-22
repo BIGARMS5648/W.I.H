@@ -41,7 +41,7 @@ function Game.new(faction, starter, now)
         unlocks = { partySlots = Game.BASE_PARTY_SLOTS, skillSlots = Game.BASE_SKILL_SLOTS },
         runes = {},
         stage = { difficulty = 1, section = 101, cleared = {}, bossIndex = {} },
-        settings = { autoRetry = true, repeatMode = false, autoAdvance = true },
+        settings = { autoRetry = false, repeatMode = false, autoAdvance = true },     -- [추정] 실패하면 앞 스테이지로 물러나 쌓는다(원작 가이드)
         stats = { kills = 0, bossKills = 0, clears = 0, fails = 0, goldEarned = 0, playSeconds = 0 },
     }
     WIH.Inventory.ensure(state)

@@ -58,7 +58,9 @@ local function record(ev, a, b, c)
     elseif ev == "clear" then
         App.addLog("|cff70b880클리어|r  " .. stageName(a))
     elseif ev == "fail" then
-        App.addLog("|cffd06058전멸|r  " .. stageName(a))
+        local runner = App.session and App.session.runner
+        local timeout = runner and runner.failReason == "time"
+        App.addLog((timeout and "|cffd06058시간 초과|r  " or "|cffd06058전멸|r  ") .. stageName(a))
     elseif ev == "levelUp" then
         App.addLog(WIH.Heroes.byId[a].name .. " 레벨 " .. b)
     elseif ev == "firstClear" then

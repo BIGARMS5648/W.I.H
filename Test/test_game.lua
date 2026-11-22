@@ -132,6 +132,8 @@ T.case("연속 진행: 실패하면 자동 재시도, 꺼져 있으면 이전 �
     for key = 1101, 1104 do Game.markCleared(s, key) end
     Game.selectStage(s, 1, 105)
     s.heroes.mag_fire.level = 1
+    T.eq(s.settings.autoRetry, false, "새 게임은 자동 재시도가 꺼져 있다(실패하면 물러나 쌓는다)")
+    s.settings.autoRetry = true
     local session = Session.new(s, { seed = 3, tuning = { hp = 50, atk = 200 } })   -- 이길 수 없게 만든다
     for _ = 1, 120 do session:advance(1, 100000) end
     T.ok(s.stats.fails >= 1, "실패가 기록돼야 함")
@@ -139,6 +141,28 @@ T.case("연속 진행: 실패하면 자동 재시도, 꺼져 있으면 이전 �
     s.settings.autoRetry = false
     for _ = 1, 120 do session:advance(1, 100000) end
     T.ok(Game.currentStageKey(s) < 1105, "이전 스테이지로 내려감")
+end)
+
+T.case("연속 진행: 앞으로 물러났다가 돌아올 때 이미 깬 레이드는 건너뛴다", function()
+    local s = Game.new("Alliance", "war_fury", 0)
+    for key = 1101, 1110 do Game.markCleared(s, key) end
+    Game.selectStage(s, 1, 109)
+    local session = strongSession(s)
+    for _ = 1, 600 do
+        session:advance(1, 100000)
+        if s.stage.section ~= 109 then break end
+    end
+    T.eq(Game.currentStageKey(s), 1201, "1-9를 깨면 이미 깬 1-10 레이드를 건너 2-1로")
+    -- 레이드를 아직 깨지 않았으면 머문다
+    local s2 = Game.new("Alliance", "war_fury", 0)
+    for key = 1101, 1108 do Game.markCleared(s2, key) end
+    Game.selectStage(s2, 1, 109)
+    local session2 = strongSession(s2)
+    local cleared = false
+    session2.listeners[#session2.listeners + 1] = function(ev) if ev == "clear" then cleared = true end end
+    for _ = 1, 600 do session2:advance(1, 100000); if cleared then break end end
+    for _ = 1, 10 do session2:advance(1, 100000) end
+    T.eq(Game.currentStageKey(s2), 1109, "깨지 않은 레이드 앞에서는 머문다")
 end)
 
 T.case("연속 진행: 틱 예산과 밀린 시간 상한", function()

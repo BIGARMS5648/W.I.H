@@ -25,6 +25,10 @@ local WAVE_GAP = 700        -- [독자] 새 웨이브가 선두 영웅 앞쪽에
 local MOB_SPACING = 45      -- [독자] 웨이브 안 몬스터 사이 간격
 local BOSS_GAP = 800
 local TRAVEL_PAUSE = 0.6    -- [독자] 웨이브를 정리한 뒤 다음 웨이브가 나타나기까지의 시간
+-- 시간 제한 [독자]: 이길 수도 질 수도 없는 싸움에서 방치 진행이 멈추지 않도록, 넘기면 실패로 친다(다음 행동은 실패와 같다).
+Runner.BOSS_TIME = 180       -- 스테이지 보스 한 마리
+Runner.RAID_BOSS_TIME = 300  -- 레이드 보스 한 마리
+Runner.STAGE_TIME = 1800     -- 스테이지 전체
 
 -- opts:
 --   difficulty(1~4), section(구간 키), seed
@@ -127,11 +131,54 @@ function Runner.bossValues(stage, section, def)
     }
 end
 
+-- 보스 패턴 보정 [독자]: 원작의 보스는 기본 공격만 한다. 이 프로젝트의 보스 패턴 피해가 원작 수치에 그대로 더해지지 않도록,
+-- "기본 공격 + 패턴"의 피해가 "기본 공격만"의 피해와 같아지게 보스의 공격력을 줄인다.
+-- 재는 방법: 가만히 서 있는 허수아비 5개를 상대로 40초 동안 준 피해의 합을 비교한다. 기준은 "물리 기본 공격만"이고(원작 액트 보스),
+-- 허수아비는 물리 피해를 절반 막고 원소 피해는 그대로 받는다(방어도가 있는 영웅의 대표값 [독자]). 그래서 원소 보스는 더 많이 줄어든다.
+-- 보스(와 쓰는 패턴 수)마다 한 번만 재고 기억한다. 비율은 PATTERN_FLOOR~1로 묶는다.
+Runner.PATTERN_WINDOW = 40
+Runner.PATTERN_FLOOR = 0.08
+local patternCache = {}
+
+local function measureOutput(def, n, physical)
+    local b = Battle.new({ seed = 3, stageLevel = 1, autoRevive = false })
+    local dummies = {}
+    for i = 1, 5 do
+        local d = Unit.new({ name = "허수아비", team = 1, kind = "dummy", melee = true, range = 100, x = -(i - 1) * 20, rank = i,
+            base = { MaxHp = 1e15, AttackDamage = 0, AttackSpeed = 100, MovementSpeed = 0, CriticalDamage = 1000, CastSpeed = 100,
+                PhysicalDamageReduction = 500 } })
+        d.custom = function() end
+        b:addUnit(d)
+        dummies[i] = d
+    end
+    local boss = Runner.spawnMonster(b, def, { hp = 1e12, atk = 100, gold = 0, exp = 0 }, 200, nil, n, true)
+    if physical then boss.basicElem = "Physical" end
+    b:run(Runner.PATTERN_WINDOW)
+    local total = 0
+    for _, d in ipairs(dummies) do total = total + d.stats.taken end
+    return total
+end
+
+function Runner.patternScale(def, maxSkills)
+    local n = math.min(#(def.skills or {}), maxSkills or #(def.skills or {}))
+    if n == 0 and (def.elem or "Physical") == "Physical" then return 1 end
+    local key = def.id .. ":" .. n
+    local k = patternCache[key]
+    if k then return k end
+    local basic, all = measureOutput(def, 0, true), measureOutput(def, n)
+    k = (all > 0 and basic > 0) and basic / all or 1
+    if k > 1 then k = 1 elseif k < Runner.PATTERN_FLOOR then k = Runner.PATTERN_FLOOR end
+    patternCache[key] = k
+    return k
+end
+
 -- values = { hp, atk, gold, exp }(이미 스테이지에 맞춰진 실제 수치), tuning = { hp, atk }(5인 보정 계수)
 -- maxSkills가 있으면 패턴을 앞에서부터 그 수만큼만 쓴다(레이드 보스의 난이도별 패턴 수).
-function Runner.spawnMonster(battle, def, values, x, tuning, maxSkills)
+-- raw가 참이면 패턴 보정을 하지 않는다(보정 값을 잴 때).
+function Runner.spawnMonster(battle, def, values, x, tuning, maxSkills, raw)
     tuning = tuning or { hp = 1, atk = 1 }
     local hp, atk = values.hp * tuning.hp, values.atk * tuning.atk
+    if not raw and def.isBoss then atk = atk * Runner.patternScale(def, maxSkills) end
     local gold, exp = values.gold, values.exp
     if hp < 1 then hp = 1 end
     local u = Unit.new({
@@ -190,6 +237,7 @@ function R:spawnBoss()
     local id = ids[(turn - 1) % #ids + 1]
     local def = Monsters.defs[id]
     self.boss = Runner.spawnMonster(self.battle, def, Runner.bossValues(self.stage, self.section, def), self:frontX() + BOSS_GAP, self.tuning)
+    self.bossStart = self.battle.time
     self.phase = "boss"
     self:emit("boss", self.boss)
 end
@@ -200,15 +248,29 @@ function R:spawnRaidBoss()
     self.wave = self.wave + 1
     local def = Monsters.defs[self.raid.bosses[self.wave]]
     local final = self.stage.actBossFinal
-    local share = (self.wave == self.waves) and 1 or Raids.EARLY_HP
-    local totalShare = 1 + (self.waves - 1) * Raids.EARLY_HP
+    local share = Raids.hpShare(self.wave, self.waves)
     local values = {
         hp = final.hp * share, atk = final.atk * final.as / def.as,
-        gold = final.gold * share / totalShare, exp = final.exp * share / totalShare,
+        gold = final.gold * share, exp = final.exp * share,
     }
     self.boss = Runner.spawnMonster(self.battle, def, values, self:frontX() + BOSS_GAP, self.tuning, Raids.skillCount(self.difficulty))
+    self.bossStart = self.battle.time
     self.phase = "boss"
     self:emit("boss", self.boss, self.wave, self.waves)
+end
+
+-- 레이드 보스 사이의 숨 돌리기 [독자]: 쓰러진 영웅은 체력 RAID_REST로 일어나고, 살아 있는 영웅은 최대 체력의 RAID_REST만큼 회복한다.
+-- 재사용 시간과 지속 효과는 그대로 이어진다.
+Runner.RAID_REST = 0.5
+function R:raidRest()
+    local b = self.battle
+    for _, u in ipairs(self.heroes) do
+        if u.alive then
+            b:heal(nil, u, u:get("MaxHp") * Runner.RAID_REST, true)
+        else
+            b:revive(u, Runner.RAID_REST)
+        end
+    end
 end
 
 -- 전투 이벤트: 몬스터가 죽으면 보상을 계산한다.
@@ -261,6 +323,13 @@ function R:step()
         self:emit("fail", self.wave)
         return self.result
     end
+    local limit = self.raid and Runner.RAID_BOSS_TIME or Runner.BOSS_TIME
+    if (self.phase == "boss" and self.bossStart and b.time - self.bossStart > limit) or b.time > Runner.STAGE_TIME then
+        self.result = "fail"
+        self.failReason = "time"
+        self:emit("fail", self.wave, "time")
+        return self.result
+    end
 
     if b:count(2) == 0 then
         if self.phase == "wave" then
@@ -276,6 +345,7 @@ function R:step()
             if self.raid and self.wave < self.waves then
                 self.phase = "travel"            -- 다음 보스로 이동
                 self.timer = TRAVEL_PAUSE
+                self:raidRest()
             else
                 self.result = "clear"
                 self:emit("clear", self.totals)

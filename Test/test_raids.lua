@@ -91,8 +91,10 @@ T.case("레이드 진행: 보스가 차례로 나오고, 마지막 보스는 원
         T.eq(runner.battle, battle, "보스가 바뀌어도 같은 전투가 이어진다")
         T.eq(#order, #Raids.byAct[act].bosses)
         for i, id in ipairs(Raids.byAct[act].bosses) do T.eq(order[i], Monsters.defs[id].name, "보스 순서") end
-        T.near(hps[#hps], final.hp, 1e-6, "마지막 보스의 체력 = 원작 액트 보스")
-        if #hps > 1 then T.near(hps[1], final.hp * Raids.EARLY_HP, 1e-6, "앞 보스의 체력") end
+        local sum = 0
+        for _, hp in ipairs(hps) do sum = sum + hp end
+        T.near(sum, final.hp, 1e-6, "보스 체력 합 = 원작 액트 보스")
+        T.near(hps[#hps], final.hp * (#hps > 1 and Raids.FINAL_SHARE or 1), 1e-6, "마지막 보스의 몫")
         T.near(golds, final.gold, 1e-6, "골드 총량 = 원작")
         T.near(exps, final.exp, 1e-6, "경험치 총량 = 원작")
     end

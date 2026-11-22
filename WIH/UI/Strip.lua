@@ -57,7 +57,8 @@ Strip.listener = function(ev, a, b, c, d, e, g)
     elseif ev == "clear" then
         Scene.banner(scene, "클리어", C.good)
     elseif ev == "fail" then
-        Scene.banner(scene, "전멸", C.bad)
+        local runner = App.session and App.session.runner
+        Scene.banner(scene, (runner and runner.failReason == "time") and "시간 초과" or "전멸", C.bad)
     end
 end
 

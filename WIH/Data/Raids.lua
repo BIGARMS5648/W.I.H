@@ -13,7 +13,16 @@ local Raids = WIH.module("Raids")
 local boss, P = Monsters.boss, Monsters.P
 local FIRE, COLD, LIGHT, CHAOS, PHYS = "Fire", "Cold", "Lightning", "Chaos", "Physical"
 
-Raids.EARLY_HP = 0.35                                   -- 마지막 보스가 아닌 보스의 체력 비율 [독자]
+-- 레이드 체력 [독자]: 보스 전원의 체력 합 = 원작 액트 보스의 체력. 보스가 여럿이면 마지막 보스가 FINAL_SHARE를 갖고
+-- 나머지 보스가 남은 몫을 똑같이 나눈다(오닉시아처럼 한 명이면 그 보스가 전부). 원작의 한 판과 잡는 데 드는 시간이 같아진다.
+Raids.FINAL_SHARE = 0.5
+
+-- 보스 순번 i(보스 n명 중)의 체력 몫
+function Raids.hpShare(i, n)
+    if n <= 1 then return 1 end
+    if i == n then return Raids.FINAL_SHARE end
+    return (1 - Raids.FINAL_SHARE) / (n - 1)
+end
 Raids.TOKEN = { 190001, 190002, 190003, 190004 }        -- 난이도별 입장 재료(원작의 영혼석 자리) [원작]
 Raids.TOKEN_NAME = "용사의 증표"
 Raids.TOKEN_STAGE = 9                                   -- 각 액트의 9번 스테이지를 처음 클리어하면 그 난이도의 증표 1개 [원작]

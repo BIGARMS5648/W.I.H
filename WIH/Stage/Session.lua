@@ -229,8 +229,13 @@ function S:chooseAfterClear()
     if not nextKey then return end
     local nextStage = Tables.STAGES[nextKey]
     if nextStage.actBoss then
-        self:emit("raidUnlocked", nextKey)
-        return
+        -- 레이드를 이미 클리어했으면 그 뒤 던전으로 넘어간다(앞으로 물러났다가 돌아오는 길). 아니면 머물며 레이드를 알린다.
+        if (state.stage.cleared[nextKey] or 0) > 0 and nextStage.next then
+            nextKey = nextStage.next
+        else
+            if (state.stage.cleared[self.stageKey] or 0) == 1 then self:emit("raidUnlocked", nextKey) end
+            return
+        end
     end
     local difficulty = math.floor(nextKey / 1000)
     local section = nextKey % 1000
