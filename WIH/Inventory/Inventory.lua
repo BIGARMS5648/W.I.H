@@ -2,6 +2,7 @@
 -- 인벤토리는 계정 공용이다. 가득 차면 새로 얻은 아이템은 임시 보관함으로 간다(원작의 우편함 역할). [원작 구조]
 -- 저장 형태: state.inventory = { items = { {id = 아이템 ID, lock = true?}, ... }, bought = 산 칸 수 }
 --            state.mail = { {id = ...}, ... }, state.heroes[영웅].gear = { MAIN = {id = ...}, ... }
+--            state.stash = { slots = 열린 칸 수(모든 페이지 공통), pages = { { 보관 항목... }, ... } }
 
 local _, WIH = ...
 local Stats = WIH.module("Stats")
@@ -23,12 +24,93 @@ local SLOT_COSTS = {
 
 local function fail(reason) return false, reason end
 
+------------------------------------------------------------------------
+-- 창고: 장비를 맡겨 두는 곳. 큐브의 자동 채우기·일괄 팔기가 건드리지 않는다. [원작 구조]
+--   칸: 처음 41칸, 골드로 131칸까지 [원작 t_stash]. 페이지: 1장 + 룬(창고의 룬, 노드 3개) [원작].
+--   열린 칸 수는 모든 페이지에 같게 적용한다 [추정: 원작에서 페이지별로 따로 사는지 미확인].
+------------------------------------------------------------------------
+
+Inventory.STASH_BASE_PAGES = 1
+Inventory.STASH_MAX_PAGES = 4
+
+local function ensureStash(state)
+    local st = state.stash
+    if type(st) ~= "table" then st = { slots = WIH.StashTable.FREE, pages = {} }; state.stash = st end
+    if type(st.slots) ~= "number" or st.slots ~= st.slots then st.slots = WIH.StashTable.FREE end
+    st.slots = math.max(WIH.StashTable.FREE, math.min(WIH.StashTable.MAX, math.floor(st.slots)))
+    if type(st.pages) ~= "table" then st.pages = {} end
+    for i = 1, Inventory.STASH_MAX_PAGES do
+        if type(st.pages[i]) ~= "table" then st.pages[i] = {} end
+    end
+    return st
+end
+Inventory.ensureStash = ensureStash
+
+function Inventory.stashPages(state)
+    local rune = WIH.Runes and WIH.Runes.total(state, "UnlockStashPageCount") or 0
+    return math.min(Inventory.STASH_MAX_PAGES, Inventory.STASH_BASE_PAGES + rune)
+end
+
+function Inventory.stashCapacity(state) return ensureStash(state).slots end
+
+function Inventory.stashCount(state, page)
+    return #ensureStash(state).pages[page]
+end
+
+function Inventory.nextStashSlotCost(state)
+    local st = ensureStash(state)
+    if st.slots >= WIH.StashTable.MAX then return nil end
+    return WIH.StashTable.COST[st.slots - WIH.StashTable.FREE + 1]
+end
+
+function Inventory.buyStashSlot(state)
+    local cost = Inventory.nextStashSlotCost(state)
+    if not cost then return fail("더 살 수 있는 창고 칸이 없습니다.") end
+    if state.gold < cost then return fail("골드가 부족합니다.") end
+    state.gold = state.gold - cost
+    state.stash.slots = state.stash.slots + 1
+    return true
+end
+
+-- 가방의 index번 장비를 창고로. page를 주지 않으면 자리가 있는 첫 페이지로. 넣은 페이지를 돌려준다.
+function Inventory.toStash(state, index, page)
+    local st = ensureStash(state)
+    local entry = state.inventory.items[index]
+    if not entry then return fail("고른 장비가 없습니다.") end
+    local pages = Inventory.stashPages(state)
+    if page then
+        if page < 1 or page > pages then return fail("열리지 않은 창고 페이지입니다.") end
+        if #st.pages[page] >= st.slots then return fail("창고 " .. page .. "쪽이 가득 찼습니다.") end
+    else
+        for p = 1, pages do
+            if #st.pages[p] < st.slots then page = p; break end
+        end
+        if not page then return fail("창고가 가득 찼습니다.") end
+    end
+    table.remove(state.inventory.items, index)
+    table.insert(st.pages[page], entry)
+    Inventory.claimMail(state)
+    return page
+end
+
+function Inventory.fromStash(state, page, i)
+    local st = ensureStash(state)
+    local list = st.pages[page]
+    local entry = list and list[i]
+    if not entry then return fail("고른 장비가 없습니다.") end
+    if Inventory.free(state) <= 0 then return fail("가방이 가득 찼습니다.") end
+    table.remove(list, i)
+    table.insert(state.inventory.items, entry)
+    return true
+end
+
 -- 저장 데이터에 필요한 표가 없으면 만든다.
 function Inventory.ensure(state)
     if type(state.inventory) ~= "table" then state.inventory = { items = {}, bought = 0 } end
     if type(state.inventory.items) ~= "table" then state.inventory.items = {} end
     if type(state.inventory.bought) ~= "number" then state.inventory.bought = 0 end
     if type(state.mail) ~= "table" then state.mail = {} end
+    ensureStash(state)
     for _, h in pairs(state.heroes) do
         if type(h.gear) ~= "table" then h.gear = {} end
     end
@@ -225,6 +307,12 @@ function Inventory.validate(state, notes)
     if #state.mail ~= (function() local n = 0 for _ in pairs(state.mail) do n = n + 1 end return n end)() then state.mail = asArray(state.mail) end
     cleanList(inv.items, "인벤토리")
     cleanList(state.mail, "임시 보관함")
+    for p, list in ipairs(state.stash.pages) do
+        if #list ~= (function() local n = 0 for _ in pairs(list) do n = n + 1 end return n end)() then
+            list = asArray(list); state.stash.pages[p] = list
+        end
+        cleanList(list, "창고 " .. p .. "쪽")
+    end
     for heroId, h in pairs(state.heroes) do
         for slot, entry in pairs(h.gear) do
             local item = type(entry) == "table" and Items.byId[entry.id] or nil

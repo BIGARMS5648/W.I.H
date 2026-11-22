@@ -358,4 +358,40 @@ T.case("저장: 형식 1의 저장을 2로 올리고, 잘못된 장비·아이�
     T.eq(info2.status, "ok", table.concat(info2.notes, " / "))
 end)
 
+T.case("창고: 41칸에서 시작, 칸 비용은 원작 표, 페이지는 룬으로, 가득 차면 거절, 검증", function()
+    local s = newState()
+    s.gold = 1e9
+    T.eq(Inventory.stashCapacity(s), 41)
+    T.eq(Inventory.stashPages(s), 1)
+    T.eq(Inventory.nextStashSlotCost(s), 100)
+    local total = 0
+    while Inventory.nextStashSlotCost(s) do
+        total = total + Inventory.nextStashSlotCost(s)
+        T.ok(Inventory.buyStashSlot(s))
+    end
+    T.eq(total, 66510300, "131칸까지 합계 [원작]")
+    T.eq(Inventory.stashCapacity(s), 131)
+    s.stash.slots = 41
+    local id = Items.find("HELMET", 1, 1).id
+    for _ = 1, 42 do
+        Inventory.add(s, id)
+    end
+    for i = 1, 41 do T.eq(Inventory.toStash(s, 1), 1) end
+    T.ok(not Inventory.toStash(s, 1), "1쪽이 가득 차고 다른 페이지가 없으면 거절")
+    for key, node in pairs(WIH.RuneData.nodes) do if node.stat == "UnlockStashPageCount" then s.runes[key] = node.max end end
+    T.eq(Inventory.stashPages(s), 4)
+    T.eq(Inventory.toStash(s, 1), 2, "자리가 있는 다음 페이지로")
+    -- 가방이 가득 차면 꺼낼 수 없다
+    for _ = 1, Inventory.free(s) do Inventory.add(s, id) end
+    T.ok(not Inventory.fromStash(s, 1, 1))
+    s.inventory.items = {}
+    T.ok(Inventory.fromStash(s, 1, 1))
+    T.eq(#s.stash.pages[1], 40)
+    -- 망가진 항목은 지운다
+    s.stash.pages[3] = { { id = -5 }, { id = id } }
+    local notes = {}
+    Inventory.validate(s, notes)
+    T.eq(#s.stash.pages[3], 1)
+end)
+
 if not T.report("test_items") then os.exit(1) end

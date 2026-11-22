@@ -37,6 +37,7 @@ Data\ItemTypes.lua
 Data\ChestTable.lua
 Data\Materials.lua
 Inventory\Items.lua
+Data\StashTable.lua
 Inventory\Inventory.lua
 Inventory\Chests.lua
 Stage\Expeditions.lua

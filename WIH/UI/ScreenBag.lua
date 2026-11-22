@@ -65,6 +65,13 @@ local function note(ok, why)
     if not ok and why then WIH.Main.notice(why, C.bad) end
 end
 
+-- 지금 보는 곳: 가방이면 인벤토리 목록, 창고면 그 페이지의 목록
+local function source(f, s)
+    if f.src == "bag" then return s.inventory.items, Inventory.capacity(s) end
+    Inventory.ensureStash(s)
+    return s.stash.pages[f.src], Inventory.stashCapacity(s)
+end
+
 local function passes(f, item)
     if f.filter == "all" then return true end
     if f.filter == "usable" then return Items.usableBy(item, target(f)) end
@@ -74,8 +81,22 @@ end
 local function create(parent)
     local f = CreateFrame("Frame", nil, parent)
     f.filter = "all"
-    f.view = {}             -- 화면의 칸 번호 → 인벤토리 번호
-    f.selected = nil        -- 고른 인벤토리 번호
+    f.view = {}             -- 화면의 칸 번호 → 인벤토리(또는 창고 페이지) 번호
+    f.selected = nil        -- 고른 번호
+    f.src = "bag"           -- "bag" 또는 창고 페이지 번호
+
+    -- 오른쪽 위: 가방 / 창고 페이지
+    f.srcSeg = UI.segment(f, { { "bag", "가방" }, { 1, "창고 1" }, { 2, "창고 2" }, { 3, "창고 3" }, { 4, "창고 4" } }, 330, function(id)
+        local s = App.state
+        if id ~= "bag" and id > Inventory.stashPages(s) then
+            WIH.Main.notice("창고 " .. id .. "쪽은 성장 → 룬의 '창고의 룬'으로 엽니다.", C.bad)
+        else
+            f.src = id
+            f.selected = nil
+        end
+        UI.screens.bag.refresh(f)
+    end)
+    f.srcSeg:SetPoint("TOPRIGHT", -12, -8)
 
     -- 첫 줄: 장착 대상
     local tl = UI.label(f, "장착 대상")
@@ -96,13 +117,14 @@ local function create(parent)
         x = x + b:GetWidth() + 5
     end
     f.sort = UI.button(f, "정렬", 46, 22, function()
+        if f.src ~= "bag" then return end
         Inventory.sort(App.state)
         f.selected = nil
         UI.screens.bag.refresh(f)
     end)
     f.sort:SetPoint("TOPRIGHT", -12, -44)
     f.buy = UI.button(f, "", 116, 22, function()
-        note(Inventory.buySlot(App.state))
+        if f.src == "bag" then note(Inventory.buySlot(App.state)) else note(Inventory.buyStashSlot(App.state)) end
         UI.screens.bag.refresh(f)
     end)
     f.buy:SetPoint("RIGHT", f.sort, "LEFT", -6, 0)
@@ -152,12 +174,26 @@ local function create(parent)
     f.dEmpty:SetPoint("TOPRIGHT", -14, -16)
     f.dEmpty:SetText("아이템을 누르면 여기에 내용이 나옵니다.\n오른쪽 클릭하면 장착 대상에게 바로 낍니다.")
     f.dEquip = UI.button(d, "장착", 76, 26, function()
+        if f.src ~= "bag" then
+            note(Inventory.fromStash(App.state, f.src, f.selected))
+            f.selected = nil
+            UI.screens.bag.refresh(f)
+            return
+        end
         note(Inventory.equip(App.state, target(f), f.selected))
         f.dirty = true
         f.selected = nil
         UI.screens.bag.refresh(f)
     end)
     f.dEquip:SetPoint("BOTTOMLEFT", 12, 12)
+    f.dStash = UI.button(d, "창고로", 64, 22, function()
+        local page, why = Inventory.toStash(App.state, f.selected)
+        if page then WIH.Main.notice("창고 " .. page .. "쪽에 넣었습니다.", C.good) else note(false, why) end
+        f.selected = nil
+        UI.screens.bag.refresh(f)
+    end)
+    f.dStash:SetPoint("TOPRIGHT", -12, -12)
+    f.dStash.tooltip = { title = "창고로", lines = { "자리가 있는 첫 창고 페이지에 맡깁니다. 창고의 장비는 큐브 자동 채우기와 일괄 팔기에 쓰이지 않습니다." } }
     f.dLock = UI.button(d, "잠금", 76, 26, function()
         local entry = App.state.inventory.items[f.selected]
         if entry then Inventory.setLock(App.state, f.selected, not entry.lock) end
@@ -258,7 +294,18 @@ local function cell(f, n)
     c.onClick = function(_, button)
         local s = App.state
         local index = f.view[n]
-        if not index or not s.inventory.items[index] then return end
+        local list = source(f, s)
+        if not index or not list[index] then return end
+        if f.src ~= "bag" then
+            if button == "RightButton" then
+                note(Inventory.fromStash(s, f.src, index))
+                f.selected = nil
+            else
+                f.selected = (f.selected ~= index) and index or nil
+            end
+            UI.screens.bag.refresh(f)
+            return
+        end
         if button == "RightButton" then
             -- 오른쪽 클릭: 장착 대상에게 바로 장착
             local ok, why = Inventory.equip(s, target(f), index)
@@ -272,7 +319,7 @@ local function cell(f, n)
     c.tooltip = function()
         local s = App.state
         local index = f.view[n]
-        local entry = s and index and s.inventory.items[index]
+        local entry = s and index and source(f, s)[index]
         local item = entry and Items.byId[entry.id]
         if not item then return nil end
         return UI.itemTip(item, entry, Inventory.equipped(s, target(f), item.slot))
@@ -353,17 +400,28 @@ local function refresh(f)
     for i = #list + 1, #f.targets do f.targets[i]:Hide() end
     for _, b in ipairs(f.filters) do b:setSelected(b.id == f.filter) end
 
-    -- 인벤토리
-    local cap, count = Inventory.capacity(s), Inventory.count(s)
-    f.bagTitle:SetText(string.format("가방  %d / %d", count, cap))
+    -- 가방 또는 창고
+    if f.src ~= "bag" and f.src > Inventory.stashPages(s) then f.src = "bag" end
+    local inBag = f.src == "bag"
+    f.srcSeg:pick(f.src)
+    for _, b in ipairs(f.srcSeg.buttons) do
+        b.label:SetTextColor(UI.rgb((b.id == f.src) and C.text or ((b.id == "bag" or b.id <= Inventory.stashPages(s)) and C.sub or C.dim)))
+    end
+    local list, cap = source(f, s)
+    local count = #list
+    f.bagTitle:SetText(string.format(inBag and "가방  %d / %d" or ("창고 " .. f.src .. "쪽  %d / %d"), count, cap))
     f.bagTitle:SetTextColor(UI.rgb(count >= cap and C.warn or C.text))
-    local cost = Inventory.nextSlotCost(s)
+    local cost
+    if inBag then cost = Inventory.nextSlotCost(s) else cost = Inventory.nextStashSlotCost(s) end
     f.buy:setText(cost and ("칸 구매 " .. UI.number(cost) .. " G") or "칸 최대")
     f.buy:setEnabled(cost ~= nil and s.gold >= cost)
-    if f.selected and not s.inventory.items[f.selected] then f.selected = nil end
+    f.buy.tooltip = not inBag and { title = "창고 칸 구매", lines = { "모든 창고 페이지의 칸이 하나씩 늘어납니다." } } or nil
+    f.sort:SetShown(inBag)
+    f.bulk:SetShown(inBag)
+    if f.selected and not list[f.selected] then f.selected = nil end
 
     local view = {}
-    for index, entry in ipairs(s.inventory.items) do
+    for index, entry in ipairs(list) do
         local item = Items.byId[entry.id]
         if item and passes(f, item) then view[#view + 1] = index end
     end
@@ -372,7 +430,7 @@ local function refresh(f)
     for n = 1, shown do
         local c = cell(f, n)
         local index = view[n]
-        local entry = index and s.inventory.items[index]
+        local entry = index and list[index]
         local item = entry and Items.byId[entry.id]
         if item then
             c:setIcon(item.icon, gradeColor(item))
@@ -391,11 +449,14 @@ local function refresh(f)
     f.grid:setHeight(math.ceil(shown / COLS) * (CELL + 4))
 
     -- 상세
-    local entry = f.selected and s.inventory.items[f.selected]
+    local entry = f.selected and list[f.selected]
     local item = entry and Items.byId[entry.id]
     local has = item ~= nil
     f.dIcon:SetShown(has); f.dName:SetShown(has); f.dMeta:SetShown(has); f.dBody:SetShown(has)
-    f.dEquip:SetShown(has); f.dLock:SetShown(has); f.dSell:SetShown(has)
+    f.dEquip:SetShown(has); f.dLock:SetShown(has and inBag); f.dSell:SetShown(has and inBag)
+    f.dStash:SetShown(has and inBag)
+    f.dEmpty:SetText(inBag and "아이템을 누르면 여기에 내용이 나옵니다.\n오른쪽 클릭하면 장착 대상에게 바로 낍니다."
+        or "창고의 아이템을 누르면 여기에 내용이 나옵니다.\n오른쪽 클릭하면 가방으로 꺼냅니다.")
     f.dEmpty:SetShown(not has)
     f.apply:SetShown(f.dirty == true)
     if has then
@@ -420,9 +481,11 @@ local function refresh(f)
         end
         f.dBody:SetText(table.concat(lines, "\n"))
         local usable = Items.usableBy(item, heroId)
-        f.dEquip:setEnabled(usable)
-        f.dEquip.tooltip = usable and { title = "장착", lines = { hero.name .. "에게 낍니다. 끼고 있던 것은 가방으로 돌아옵니다." } }
-            or { title = "장착할 수 없음", lines = { hero.name .. "이(가) 쓰는 종류가 아닙니다." } }
+        f.dEquip:setText(inBag and "장착" or "가방으로")
+        f.dEquip:setEnabled(usable or not inBag)
+        f.dEquip.tooltip = not inBag and { title = "가방으로", lines = { "창고에서 꺼내 가방에 넣습니다." } }
+            or (usable and { title = "장착", lines = { hero.name .. "에게 낍니다. 끼고 있던 것은 가방으로 돌아옵니다." } }
+            or { title = "장착할 수 없음", lines = { hero.name .. "이(가) 쓰는 종류가 아닙니다." } })
         f.dLock:setText(entry.lock and "잠금 해제" or "잠금")
         f.dSell:setText("팔기 +" .. UI.number(Inventory.alchemyValue(s, item)) .. " G")
         f.dSell:setEnabled(not entry.lock)

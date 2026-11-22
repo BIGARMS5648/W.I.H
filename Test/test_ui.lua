@@ -411,6 +411,41 @@ T.case("가방 화면: 장착 대상, 잠금, 팔기, 칸 구매, 상자", funct
     noErrors("가방 화면")
 end)
 
+T.case("창고: 가방에서 맡기고 꺼내기, 칸 구매, 룬으로 페이지 열기", function()
+    local s = App.state
+    s.gold = 1e7
+    s.inventory.items = {}
+    Inventory.add(s, Items.find("HELMET", 1, 1).id)
+    Inventory.add(s, Items.find("BOOTS", 1, 1).id)
+    local f = open("bag")
+    local function seg(id) for _, b in ipairs(f.srcSeg.buttons) do if b.id == id then b:Click("LeftButton") end end end
+    f.cells[1]:Click("LeftButton")
+    T.ok(f.dStash:IsShown(), "가방의 장비에는 창고로 버튼")
+    f.dStash:Click("LeftButton")
+    T.eq(#s.inventory.items, 1)
+    T.eq(#s.stash.pages[1], 1, "창고 1쪽에 들어감")
+    seg(1)
+    T.eq(f.src, 1)
+    T.ok(f.bagTitle:GetText():find("창고 1쪽  1 / 41"), f.bagTitle:GetText())
+    T.ok(not f.bulk:IsShown() and not f.sort:IsShown(), "창고에서는 일괄 팔기·정렬이 없음")
+    local before = Inventory.stashCapacity(s)
+    f.buy:Click("LeftButton")
+    T.eq(Inventory.stashCapacity(s), before + 1, "창고 칸 구매")
+    T.eq(s.gold, 1e7 - 100, "42번째 칸 100골드 [원작]")
+    f.cells[1]:Click("LeftButton")
+    T.eq(f.dEquip.label:GetText(), "가방으로")
+    f.cells[1]:Click("RightButton")
+    T.eq(#s.stash.pages[1], 0, "오른쪽 클릭으로 꺼냄")
+    T.eq(#s.inventory.items, 2)
+    seg(2)
+    T.eq(f.src, 1, "닫힌 페이지는 열리지 않음")
+    for key, node in pairs(WIH.RuneData.nodes) do if node.stat == "UnlockStashPageCount" then s.runes[key] = node.max end end
+    seg(2)
+    T.eq(f.src, 2, "룬을 사면 페이지가 열림")
+    seg("bag")
+    noErrors("창고")
+end)
+
 T.case("성장 화면(룬): 구매가 골드와 룬 레벨에 반영된다", function()
     local s = App.state
     s.gold = 100000
