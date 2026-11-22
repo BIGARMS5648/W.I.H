@@ -77,6 +77,40 @@ Runes.STATS = {
     OpenAllTypeChestAllAtOnce = { "모든 상자 일괄 개봉", "unlock" },
 }
 
+-- 아직 이 효과를 쓰는 시스템이 들어오지 않은 스탯. 살 수는 있지만(뒤의 룬을 여는 조건이므로) 지금은 효과가 없다.
+-- 해당 시스템을 구현할 때 여기서 지운다. 화면은 이 표를 보고 "미적용"을 표시한다.
+Runes.INACTIVE = {
+    AdditionalGoldActBoss = "레이드", AdditionalExpActBoss = "레이드",
+    DropChanceNormalChestPercent = "상자", DropChanceStageBossChestPercent = "상자",
+    MaxAmountNormalChest = "상자", MaxAmountStageBossChest = "상자", MaxAmountActBossChest = "상자",
+    UnlockAutoOpenNormalChest = "상자", UnlockAutoOpenStageBossChest = "상자", UnlockAutoOpenActBossChest = "상자",
+    ReduceAutoOpenNormalChestTime = "상자", ReduceAutoOpenStageBossChestTime = "상자", ReduceAutoOpenActBossChestTime = "상자",
+    OpenOneTypeChestAllAtOnce = "상자", OpenAllTypeChestAllAtOnce = "상자",
+    CubeAlchemyGoldPercent = "큐브", CubeExpPercent = "큐브",
+    OfflineRewardGoldPercent = "오프라인 보상", OfflineRewardExpPercent = "오프라인 보상", UnlockOfflineReward = "오프라인 보상",
+    MaxInventorySlot = "인벤토리", UnlockStashPageCount = "보관함",
+}
+
+-- 수치의 표기: "+10", "+5%", "-3초", "해금"
+function Runes.valueText(stat, value)
+    local info = Runes.STATS[stat]
+    local unit = info and info[2] or "flat"
+    local function num(v)
+        if v == math.floor(v) then return tostring(v) end
+        return (string.format("%.1f", v))
+    end
+    if unit == "pct" then return "+" .. num(value / 10) .. "%" end
+    if unit == "sec" then return "-" .. num(value) .. "초" end
+    if unit == "unlock" then return "해금" end
+    if stat == "WaveCountReduction" then return "-" .. num(value) end
+    return "+" .. num(value)
+end
+
+function Runes.label(stat)
+    local info = Runes.STATS[stat]
+    return info and info[1] or stat
+end
+
 local function fail(reason) return false, reason end
 
 function Runes.level(state, key)

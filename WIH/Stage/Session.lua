@@ -27,8 +27,25 @@ function Session.new(state, opts)
     return s
 end
 
-function S:emit(ev, a, b, c, d)
-    for i = 1, #self.listeners do self.listeners[i](ev, a, b, c, d) end
+function S:emit(ev, a, b, c, d, e, f, g)
+    for i = 1, #self.listeners do self.listeners[i](ev, a, b, c, d, e, f, g) end
+end
+
+function S:addListener(fn)
+    self.listeners[#self.listeners + 1] = fn
+    return fn
+end
+
+function S:removeListener(fn)
+    for i = #self.listeners, 1, -1 do
+        if self.listeners[i] == fn then table.remove(self.listeners, i) end
+    end
+end
+
+-- 화면이 전투 장면을 보고 있는 동안만 켠다.
+function S:watchBattle(on)
+    self.relayBattle = on and true or false
+    if self.runner then self.runner.relayBattle = self.relayBattle end
 end
 
 -- 현재 선택된 스테이지를 새로 시작한다. 편성이나 스킬을 바꾼 뒤에도 이것을 부른다.
@@ -45,15 +62,16 @@ function S:startStage()
         waveReduction = totals.WaveCountReduction or 0,
         seed = self.seed + self.runs * 7919, party = Game.buildParty(state), account = account,
         bossIndex = state.stage.bossIndex[key] or 1, tuning = self.tuning,
-        onEvent = function(ev, a, b, c) self:onRunnerEvent(ev, a, b, c) end,
+        onEvent = function(ev, a, b, c, d, e, f, g) self:onRunnerEvent(ev, a, b, c, d, e, f, g) end,
     })
+    self.runner.relayBattle = self.relayBattle
     self.stageKey = key
     self.wait = 0
     self:emit("stageStart", key, self.runner)
     return self.runner
 end
 
-function S:onRunnerEvent(ev, a, b, c)
+function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
     local state = self.state
     if ev == "kill" then
         local reward = b
@@ -67,7 +85,7 @@ function S:onRunnerEvent(ev, a, b, c)
         local stageLevel = runner.stage.level
         for rank, u in ipairs(runner.heroes) do
             if u.alive then
-                local heroId = state.party[rank]
+                local heroId = u.heroId      -- 스테이지 도중에 편성을 바꿔도 싸우고 있는 영웅이 받는다
                 local h = state.heroes[heroId]
                 if h then
                     -- (기본 + 고정 추가) × 경험치 획득 % × 레벨 차 페널티 [독자: 적용 순서는 원작에서 확인되지 않음]
@@ -88,7 +106,7 @@ function S:onRunnerEvent(ev, a, b, c)
         self:emit("fail", self.stageKey)
         self:chooseAfterFail()
     else
-        self:emit(ev, a, b, c)
+        self:emit(ev, a, b, c, d, e, f, g)
     end
 end
 

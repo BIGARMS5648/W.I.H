@@ -1,5 +1,10 @@
 -- 스테이지 진행기: 웨이브 → … → 보스 → 클리어 또는 실패. 처치 보상을 계산해 이벤트로 알린다.
--- 구조와 수치(웨이브 수, 웨이브당 몬스터 수, 보스 배율, 스테이지 레벨 배율)는 원작 표를 쓴다.
+-- 구조(웨이브 수, 웨이브당 몬스터 수)는 원작 표 그대로다.
+-- 몬스터의 세기와 보상은 원작의 그 스테이지 값에 맞춘다 [원작 수치 / 독자 배치]:
+--   · 일반 몬스터: 이 던전의 몬스터 구성(가중치 포함)의 평균 체력·초당 피해·골드·경험치가
+--     원작 그 스테이지의 평균(Tables.STAGES[키].mob)과 같아지도록 배율을 건다. 몬스터끼리의 상대적 차이는 유지된다.
+--   · 보스: 이 던전의 보스들(클리어마다 차례로 등장)의 평균 체력·초당 피해가 원작 그 스테이지 보스의 최종값
+--     (bossFinal)과 같아지도록 배율을 건다. 보상은 원작 값 그대로다. 보스 패턴의 피해는 그 위에 더해진다 [독자].
 
 local _, WIH = ...
 local Tables = WIH.module("Tables")
@@ -54,21 +59,60 @@ function Runner.new(opts)
     return r
 end
 
-function R:emit(ev, a, b, c, d)
-    for i = 1, #self.listeners do self.listeners[i](ev, a, b, c, d) end
+function R:emit(ev, a, b, c, d, e, f, g)
+    for i = 1, #self.listeners do self.listeners[i](ev, a, b, c, d, e, f, g) end
 end
 
 -- 몬스터 정의와 스테이지 레벨로 전투 유닛을 만든다. bossMult = 스테이지 보스 배율(퍼밀 4개) 또는 nil
-function Runner.spawnMonster(battle, def, stageLevel, x, bossMult, tuning)
-    local hp, atk, gold, exp = Level.monsterValues(def, stageLevel)
-    if bossMult then
-        hp = hp * bossMult[2] / 1000
-        atk = atk * bossMult[1] / 1000
-        gold = gold * bossMult[3] / 1000
-        exp = exp * bossMult[4] / 1000
+-- 구간의 몬스터 구성에서 가중 평균(기본값 기준)을 구한다. 한 번 계산해 구간 표에 넣어 둔다.
+local function sectionMeans(section)
+    if section.means then return section.means end
+    local w, hp, dps, gold, exp = 0, 0, 0, 0, 0
+    for _, m in ipairs(section.mobs) do
+        local def = Monsters.defs[m.id]
+        w = w + m.weight
+        hp = hp + def.hp * m.weight
+        dps = dps + def.atk * def.as / 100 * m.weight
+        gold = gold + def.gold * m.weight
+        exp = exp + def.exp * m.weight
     end
+    local bn, bhp, bdps = #section.bosses, 0, 0
+    for _, id in ipairs(section.bosses) do
+        local def = Monsters.defs[id]
+        bhp = bhp + def.hp
+        bdps = bdps + def.atk * def.as / 100
+    end
+    section.means = { hp = hp / w, dps = dps / w, gold = gold / w, exp = exp / w, bossHp = bhp / bn, bossDps = bdps / bn }
+    return section.means
+end
+Runner.sectionMeans = sectionMeans
+
+-- 일반 몬스터 한 종의 실제 수치: 원작 스테이지 평균 × (이 몬스터의 기본값 ÷ 구간 평균)
+function Runner.mobValues(stage, section, def)
+    local mean, target = sectionMeans(section), stage.mob
+    return {
+        hp = target.hp * def.hp / mean.hp,
+        atk = target.dps * (def.atk * def.as / 100) / mean.dps / (def.as / 100),
+        gold = target.gold * def.gold / mean.gold,
+        exp = target.exp * def.exp / mean.exp,
+    }
+end
+
+-- 보스의 실제 수치: 원작 스테이지 보스의 최종값 × (이 보스의 기본값 ÷ 구간 보스 평균). 보상은 원작 값 그대로.
+function Runner.bossValues(stage, section, def)
+    local mean, target = sectionMeans(section), stage.bossFinal
+    return {
+        hp = target.hp * def.hp / mean.bossHp,
+        atk = target.dps * (def.atk * def.as / 100) / mean.bossDps / (def.as / 100),
+        gold = target.gold, exp = target.exp,
+    }
+end
+
+-- values = { hp, atk, gold, exp }(이미 스테이지에 맞춰진 실제 수치), tuning = { hp, atk }(5인 보정 계수)
+function Runner.spawnMonster(battle, def, values, x, tuning)
     tuning = tuning or { hp = 1, atk = 1 }
-    hp, atk = hp * tuning.hp, atk * tuning.atk
+    local hp, atk = values.hp * tuning.hp, values.atk * tuning.atk
+    local gold, exp = values.gold, values.exp
     if hp < 1 then hp = 1 end
     local u = Unit.new({
         name = def.name, team = 2, kind = "monster", isBoss = def.isBoss, def = def,
@@ -106,7 +150,7 @@ function R:spawnWave()
     for i = 1, self.stage.perWave do
         local pick = self.battle.rng:weighted(weights)
         local def = Monsters.defs[self.section.mobs[pick].id]
-        Runner.spawnMonster(self.battle, def, self.stage.level, base + (i - 1) * MOB_SPACING, nil, self.tuning)
+        Runner.spawnMonster(self.battle, def, Runner.mobValues(self.stage, self.section, def), base + (i - 1) * MOB_SPACING, self.tuning)
     end
     self.phase = "wave"
     self:emit("wave", self.wave, self.waves)
@@ -116,13 +160,13 @@ function R:spawnBoss()
     local ids = self.section.bosses
     local id = ids[(self.bossIndex - 1) % #ids + 1]
     local def = Monsters.defs[id]
-    self.boss = Runner.spawnMonster(self.battle, def, self.stage.level, self:frontX() + BOSS_GAP, self.stage.boss, self.tuning)
+    self.boss = Runner.spawnMonster(self.battle, def, Runner.bossValues(self.stage, self.section, def), self:frontX() + BOSS_GAP, self.tuning)
     self.phase = "boss"
     self:emit("boss", self.boss)
 end
 
 -- 전투 이벤트: 몬스터가 죽으면 보상을 계산한다.
-function R:onBattleEvent(ev, a, b)
+function R:onBattleEvent(ev, a, b, c, d, e, f)
     if ev == "death" and a.team == 2 and a.reward then
         local reward = a.reward
         local totals = self.totals
@@ -146,8 +190,8 @@ function R:onBattleEvent(ev, a, b)
         end
         self:emit("kill", a, reward)
     end
-    -- 화면과 기록용으로 전투 이벤트를 그대로 전달한다.
-    if #self.listeners > 0 then self:emit("battle", ev, a, b) end
+    -- 화면이 보고 있을 때만 전투 이벤트를 그대로 전달한다(보지 않을 때의 비용을 없앤다).
+    if self.relayBattle then self:emit("battle", ev, a, b, c, d, e, f) end
 end
 
 -- 한 틱 진행. 끝났으면 "clear" 또는 "fail"을 돌려준다.

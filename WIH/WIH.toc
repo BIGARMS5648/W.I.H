@@ -1,8 +1,9 @@
 ## Interface: 16001
 ## Title: W.I.H
 ## Notes: 와우 포에버 안에서 즐기는 독립형 방치 RPG
-## Version: 0.1.0
-## SavedVariables: WIH_DB, WIH_DB_BACKUP
+## Version: 0.2.0
+## SavedVariables: WIH_DB, WIH_DB_BACKUP, WIH_UI
+## AddonCompartmentFunc: WIH_OnCompartmentClick
 ## IconTexture: Interface\Icons\INV_Misc_Gear_01
 ## X-WIH-TOC: base
 
@@ -32,3 +33,13 @@ Data\Runes.lua
 Progression\Runes.lua
 Stage\Session.lua
 Save\Save.lua
+UI\Theme.lua
+UI\App.lua
+UI\Main.lua
+UI\ScreenSetup.lua
+UI\ScreenBattle.lua
+UI\ScreenHeroes.lua
+UI\ScreenParty.lua
+UI\ScreenStage.lua
+UI\ScreenRunes.lua
+UI\ScreenSettings.lua

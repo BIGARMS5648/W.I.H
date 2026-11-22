@@ -10,7 +10,36 @@ import json
 import os
 import sys
 
+from fractions import Fraction
+
 DIFF = {"NORMAL": 1, "NIGHTMARE": 2, "HELL": 3, "TORMENT": 4}
+
+
+def round_half_even(x):
+    """원작의 반올림(0.5는 짝수 쪽). x는 Fraction."""
+    f = x.numerator // x.denominator
+    diff = x - f
+    if diff > Fraction(1, 2):
+        return f + 1
+    if diff < Fraction(1, 2):
+        return f
+    return f if f % 2 == 0 else f + 1
+
+
+def final_values(mon, mult):
+    """몬스터 한 종의 스테이지 레벨 적용값: round(기본값 × 배율 ÷ 1000). 돌려주는 값: hp, atk, gold, exp"""
+    return (round_half_even(Fraction(mon["MaxLife"] * mult["MonsterHpMultiplier"], 1000)),
+            round_half_even(Fraction(mon["AttackDamage"] * mult["MonsterAtkDmgMultiplier"], 1000)),
+            round_half_even(Fraction(mon["RewardGold"] * mult["MonsterGoldMultiplier"], 1000)),
+            round_half_even(Fraction(mon["RewardExp"] * mult["MonsterExpMultiplier"], 1000)))
+
+
+def num(x):
+    """Lua 숫자 표기. 정수면 정수로, 아니면 소수 넷째 자리까지."""
+    x = Fraction(x)
+    if x.denominator == 1:
+        return str(x.numerator)
+    return ("%.4f" % float(x)).rstrip("0").rstrip(".")
 
 
 def load(folder, name):
@@ -48,22 +77,58 @@ def main(folder):
     w("")
 
     stages = sorted(load(folder, "stages.json"), key=lambda r: r["StageKey"])
+    monsters = {m["MonsterKey"]: m for m in load(folder, "monsters.json")}
+    mult_by_level = {r["StageLevel"]: r for r in sl}
     w("-- 스테이지 구조. 키 = 난이도(1~4) × 1000 + 액트 × 100 + 번호.")
     w("-- level, waves(웨이브 수), perWave(웨이브당 몬스터 수), chest/bossChest(상자 드롭률 퍼밀),")
     w("-- boss = {공격, 체력, 골드, 경험치 배율 퍼밀}, next(다음 스테이지 키), act(액트 보스 스테이지 여부)")
+    w("-- mob = 그 스테이지에 나오는 일반 몬스터의 가중 평균(스테이지 레벨 적용, 원작 식으로 반올림한 뒤의 값):")
+    w("--       { hp = 체력, dps = 공격력 × 공격속도, gold = 골드, exp = 경험치 }")
+    w("-- bossFinal = 스테이지 보스의 최종값(보스 배율까지 적용): { hp, dps, gold, exp }")
+    w("-- actBossFinal = 액트 보스의 최종값(보스 배율 없음): { hp, atk, as(공격속도 ×100), gold, exp }")
+    w("-- 스테이지 표가 가리키지만 몬스터 표에 없는 종(20101, 액트 2의 8·9번 스테이지)은 평균에서 뺐다.")
     w("Tables.STAGES = {")
+    missing = {}
     for r in stages:
         key = r["StageKey"]
         parts = ["level = %d" % r["StageLevel"]]
+        mult = mult_by_level[r["StageLevel"]]
         if r["STAGETYPE"] == "ACTBOSS":
             parts.append("actBoss = true")
+            b = monsters[r["BossMonsterKey"]]
+            hp, atk, gold, exp = final_values(b, mult)
+            parts.append("actBossFinal = { hp = %s, atk = %s, as = %d, gold = %s, exp = %s }"
+                         % (num(hp), num(atk), b["AttackSpeed"], num(gold), num(exp)))
         else:
+            total_w = 0
+            acc = [Fraction(0)] * 4
+            for part in r["Monsters"].split():
+                mk, weight = part.split("_")
+                weight = int(weight)
+                m = monsters.get(int(mk))
+                if m is None:
+                    # 스테이지 표가 가리키지만 몬스터 표에 없는 종(v1.00.17 자료에서 20101). 평균에서 뺀다.
+                    missing.setdefault(int(mk), []).append(key)
+                    continue
+                hp, atk, gold, exp = final_values(m, mult)
+                vals = (Fraction(hp), Fraction(atk * m["AttackSpeed"], 100), Fraction(gold), Fraction(exp))
+                acc = [a + v * weight for a, v in zip(acc, vals)]
+                total_w += weight
+            mob = [a / total_w for a in acc]
+            b = monsters[r["BossMonsterKey"]]
+            hp, atk, gold, exp = final_values(b, mult)
+            boss = (Fraction(hp * r["BossHpMultiplier"], 1000),
+                    Fraction(atk * r["BossDamageMultiplier"] * b["AttackSpeed"], 100000),
+                    Fraction(gold * r["BossGoldMultiplier"], 1000),
+                    Fraction(exp * r["BossExpMultiplier"], 1000))
             parts.append("waves = %d" % r["WaveAmount"])
             parts.append("perWave = %d" % r["WaveMonsterAmount"])
             parts.append("chest = %d" % r["MonsterDropItemRate"])
             parts.append("bossChest = %d" % r["BossDropItemRate"])
             parts.append("boss = { %d, %d, %d, %d }" % (r["BossDamageMultiplier"], r["BossHpMultiplier"],
                                                         r["BossGoldMultiplier"], r["BossExpMultiplier"]))
+            parts.append("mob = { hp = %s, dps = %s, gold = %s, exp = %s }" % tuple(num(v) for v in mob))
+            parts.append("bossFinal = { hp = %s, dps = %s, gold = %s, exp = %s }" % tuple(num(v) for v in boss))
         if r["NextStageKey"]:
             parts.append("next = %d" % r["NextStageKey"])
         assert DIFF[r["STAGEDIFFICULITY"]] == key // 1000
@@ -87,6 +152,8 @@ def main(folder):
         f.write('Tables.DIFFICULTY_NAMES = { "일반", "악몽", "지옥", "고통" }\n\n')
         f.write("return Tables\n")
     print(out_path, "levels", len(levels), "stage levels", len(sl), "stages", len(stages), "offline", len(off))
+    for mk, keys in sorted(missing.items()):
+        print("몬스터 표에 없는 종", mk, "→ 평균에서 제외한 스테이지", keys)
 
 
 if __name__ == "__main__":

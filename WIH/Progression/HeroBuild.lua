@@ -63,6 +63,22 @@ end
 --       rank, x, weaponSpeed(주무기 공격속도 가산. 없으면 기본 무기 값)
 function HeroBuild.spawn(b, heroId, opts)
     opts = opts or {}
+    local u = HeroBuild.makeUnit(heroId, opts)
+    b:addUnit(u)
+    if opts.skills then
+        for i = 1, math.min(#opts.skills, opts.maxSlots or 4) do
+            local s = opts.skills[i]
+            local def = SkillData.resolve(s[1] or s.id, u.form)
+            if not def then error("알 수 없는 스킬: " .. tostring(s[1] or s.id)) end
+            Skills.equip(b, u, def, s[2] or s.level or 1)
+        end
+    end
+    return u
+end
+
+-- 전투에 넣지 않은 유닛을 만든다. 영웅 화면의 능력치 표시도 이 유닛에서 읽는다(전투와 같은 계산).
+function HeroBuild.makeUnit(heroId, opts)
+    opts = opts or {}
     local hero = Heroes.byId[heroId]
     if not hero then error("알 수 없는 영웅: " .. tostring(heroId)) end
     local form = hero.forms and (opts.form or hero.defaultForm) or nil
@@ -91,15 +107,6 @@ function HeroBuild.spawn(b, heroId, opts)
     u.heroId = heroId
     u.form = form
     u.role = role
-    b:addUnit(u)
-    if opts.skills then
-        for i = 1, math.min(#opts.skills, opts.maxSlots or 4) do
-            local s = opts.skills[i]
-            local def = SkillData.resolve(s[1] or s.id, form)
-            if not def then error("알 수 없는 스킬: " .. tostring(s[1] or s.id)) end
-            Skills.equip(b, u, def, s[2] or s.level or 1)
-        end
-    end
     return u
 end
 

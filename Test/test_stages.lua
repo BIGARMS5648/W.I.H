@@ -65,7 +65,7 @@ T.case("보스 스킬 데이터: 효과 종류와 능력치가 올바르고 설�
 end)
 
 -- 보스 하나를 버티는 시험 파티와 싸우게 한다. 보스의 모든 패턴이 실제로 발동하는지 본다.
-local function fightBoss(def, stageLevel, seconds, seed)
+local function fightBoss(def, stageLevel, seconds, seed, sectionKey)
     local b = Battle.new({ seed = seed or 1, stageLevel = stageLevel })
     local tough = Sheet.new()
     Sheet.add(tough, "MaxHp", Stats.FLAT, 1e7)
@@ -75,7 +75,10 @@ local function fightBoss(def, stageLevel, seconds, seed)
     for rank, id in ipairs(ids) do
         heroes[rank] = HeroBuild.spawn(b, id, { rank = rank, x = -(rank - 1) * 20, account = tough })
     end
-    local boss = Runner.spawnMonster(b, def, stageLevel, 600, { 2500, 5000, 3000, 6000 })
+    local stage = Tables.STAGES[Dungeons.stageKey(1, sectionKey)]
+    local values = Runner.bossValues(stage, Dungeons.sections[sectionKey], def)
+    values.hp = 1e6        -- 패턴 발동을 보는 시험이므로 보스가 끝까지 살아 있게 한다
+    local boss = Runner.spawnMonster(b, def, values, 600)
     local cast = {}
     b.listeners[1] = function(ev, u, s) if ev == "cast" and u == boss then cast[s.id] = true end end
     b:run(seconds * 0.5)
@@ -92,7 +95,7 @@ T.case("보스 149명: 전투에서 오류 없이 싸우고 모든 패턴이 발
         local level = Tables.STAGES[Dungeons.stageKey(1, key)].level
         for _, id in ipairs(sec.bosses) do
             local def = Monsters.defs[id]
-            local ok, boss, cast, heroes = pcall(fightBoss, def, level, 120, 3)
+            local ok, boss, cast, heroes = pcall(fightBoss, def, level, 120, 3, key)
             if not ok then error(def.name .. ": " .. tostring(boss)) end
             count = count + 1
             for _, s in ipairs(def.skills) do
@@ -105,6 +108,48 @@ T.case("보스 149명: 전투에서 오류 없이 싸우고 모든 패턴이 발
     end
     T.eq(count, 149)
     T.eq(#never, 0, "발동하지 않은 보스 패턴: " .. table.concat(never, ", "))
+end)
+
+T.case("몬스터 수치: 던전 108개 스테이지 모두에서 평균이 원작 그 스테이지의 값과 같다", function()
+    local checked = 0
+    for difficulty = 1, 4 do
+        for _, key in ipairs(Dungeons.order) do
+            local sec = Dungeons.sections[key]
+            local stage = Tables.STAGES[Dungeons.stageKey(difficulty, key)]
+            local w, hp, dps, gold, exp = 0, 0, 0, 0, 0
+            for _, m in ipairs(sec.mobs) do
+                local def = Monsters.defs[m.id]
+                local v = Runner.mobValues(stage, sec, def)
+                T.ok(v.hp > 0 and v.atk > 0 and v.gold > 0 and v.exp > 0, def.name .. ": 수치가 0 이하")
+                w = w + m.weight
+                hp, dps = hp + v.hp * m.weight, dps + v.atk * def.as / 100 * m.weight
+                gold, exp = gold + v.gold * m.weight, exp + v.exp * m.weight
+            end
+            local tol = 1e-9
+            T.near(hp / w / stage.mob.hp, 1, tol, sec.name .. " 일반 몬스터 평균 체력")
+            T.near(dps / w / stage.mob.dps, 1, tol, sec.name .. " 일반 몬스터 평균 초당 피해")
+            T.near(gold / w / stage.mob.gold, 1, tol, sec.name .. " 일반 몬스터 평균 골드")
+            T.near(exp / w / stage.mob.exp, 1, tol, sec.name .. " 일반 몬스터 평균 경험치")
+            local bhp, bdps = 0, 0
+            for _, id in ipairs(sec.bosses) do
+                local def = Monsters.defs[id]
+                local v = Runner.bossValues(stage, sec, def)
+                bhp, bdps = bhp + v.hp, bdps + v.atk * def.as / 100
+                T.eq(v.gold, stage.bossFinal.gold)
+                T.eq(v.exp, stage.bossFinal.exp)
+            end
+            T.near(bhp / #sec.bosses / stage.bossFinal.hp, 1, tol, sec.name .. " 보스 평균 체력")
+            T.near(bdps / #sec.bosses / stage.bossFinal.dps, 1, tol, sec.name .. " 보스 평균 초당 피해")
+            checked = checked + 1
+        end
+    end
+    T.eq(checked, 108)
+    -- 원작 검산값: 일반 1-1은 보스 체력 12, 클리어당 14골드·16경험치. 고통 3-9 보스 체력 597,900.
+    local s11 = Tables.STAGES[1101]
+    T.eq(s11.bossFinal.hp, 12)
+    T.near(s11.waves * s11.perWave * s11.mob.gold + s11.bossFinal.gold, 14, 1e-9)
+    T.near(s11.waves * s11.perWave * s11.mob.exp + s11.bossFinal.exp, 16, 1e-9)
+    T.eq(Tables.STAGES[4309].bossFinal.hp, 597900)
 end)
 
 T.case("스테이지 진행: 웨이브를 모두 잡고 보스를 잡으면 클리어, 보상이 처치 수와 맞는다", function()

@@ -14,12 +14,32 @@ end
 
 local methods = {}
 
-function methods:Show() self.__shown = true; local s = self.__scripts.OnShow; if s then s(self) end end
-function methods:Hide() self.__shown = false; local s = self.__scripts.OnHide; if s then s(self) end end
+function methods:Show()
+    if self.__shown then return end
+    self.__shown = true
+    local s = self.__scripts.OnShow
+    if s then s(self) end
+end
+function methods:Hide()
+    if not self.__shown then return end
+    self.__shown = false
+    local s = self.__scripts.OnHide
+    if s then s(self) end
+end
 function methods:SetShown(v) if v then self:Show() else self:Hide() end end
 function methods:IsShown() return self.__shown end
-function methods:IsVisible() return self.__shown end
-function methods:SetScript(name, fn) self.__scripts[name] = fn end
+function methods:IsVisible()
+    local w = self
+    while w do
+        if not w.__shown then return false end
+        w = w.__parent
+    end
+    return true
+end
+function methods:SetScript(name, fn)
+    self.__scripts[name] = fn
+    if name == "OnUpdate" then Stub.updateFrames[self] = fn and true or nil end
+end
 function methods:GetScript(name) return self.__scripts[name] end
 function methods:HookScript(name, fn)
     local old = self.__scripts[name]
@@ -89,7 +109,8 @@ end
 widgetMeta.__index = function(self, key)
     local m = methods[key]
     if m then return m end
-    if type(key) == "string" and key:sub(1, 2) == "__" then return nil end
+    -- 위젯 API의 이름은 대문자로 시작한다. 그 밖의 키는 애드온이 프레임에 붙인 자기 필드이므로 실제처럼 nil이다.
+    if type(key) ~= "string" or not key:match("^[A-Z]") then return nil end
     if Stub.missingMethods and Stub.missingMethods[key] then return nil end
     Stub.unknownCalls[key] = (Stub.unknownCalls[key] or 0) + 1
     return function() return nil end
@@ -97,6 +118,7 @@ end
 
 -- 실제 클라이언트에서 프레임은 수거되지 않는다. 약한 참조를 쓰면 지역 변수로만 잡힌 이벤트 프레임이 사라진다.
 Stub.eventFrames = {}
+Stub.updateFrames = {}
 Stub.unknownCalls = {}
 Stub.timers = {}
 Stub.printed = {}
@@ -221,9 +243,12 @@ function Stub.advance(seconds, step)
                 i = i + 1
             end
         end
-        for frame in pairs(Stub.updateFrames or {}) do
+        local frames = {}
+        for frame in pairs(Stub.updateFrames) do frames[#frames + 1] = frame end
+        for i = 1, #frames do
+            local frame = frames[i]
             local s = frame.__scripts.OnUpdate
-            if s and frame.__shown then s(frame, step) end
+            if s and frame:IsVisible() then s(frame, step) end
         end
     end
 end
