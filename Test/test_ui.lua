@@ -513,6 +513,58 @@ T.case("레이드: 스테이지 화면에서 시작하고, 띠가 보스 순번�
     noErrors("레이드 화면")
 end)
 
+T.case("큐브 화면: 해금, 자동 채우기와 합성, 제작, 장식, 기원", function()
+    local s = App.state
+    local Cube = WIH.Cube
+    s.gold = 1e7
+    s.inventory.items = {}
+    for _ = 1, 9 do Inventory.add(s, Items.find("HELMET", 1, 1).id) end
+    local f = open("cube")
+    T.eq(f.page, "SYNTHESIS")
+    f.auto:Click("LeftButton")
+    T.eq(#f.picked, 9, "자동 채우기로 9칸이 참")
+    T.ok(f.go.enabled, "합성 버튼이 켜짐")
+    T.ok(f.odds:GetText():find("결과 등급"), "확률이 보임")
+    f.go:Click("LeftButton")
+    T.eq(#s.inventory.items, 1, "9개를 넣고 1개를 받음")
+    T.ok(f.result:GetText() ~= "", "결과가 보임")
+    -- 제작: 잠긴 단계는 해금 버튼
+    f.recipes[2]:Click("LeftButton")
+    T.eq(f.page, "CRAFTING")
+    s.cube.level = 5
+    UI.screens.cube.refresh(f)
+    T.ok(f.unlock:IsShown() and f.unlock.enabled, "해금 버튼이 보이고 켜짐")
+    f.unlock:Click("LeftButton")
+    T.ok(Cube.unlocked(s, Cube.find("CRAFTING", 1)))
+    for _, m in ipairs(Cube.craftCost("MAIN", 1)) do s.materials[m[1]] = 5 end
+    UI.screens.cube.refresh(f)
+    T.ok(f.go.enabled)
+    f.go:Click("LeftButton")
+    T.eq(#s.inventory.items, 2, "제작한 장비가 가방에 들어옴")
+    -- 장식
+    s.cube.level = 30
+    Cube.unlock(s, Cube.find("DECORATION"))
+    Inventory.add(s, Items.find("SWORD", 30, 4).id)
+    s.materials[110001] = 2
+    f.recipes[3]:Click("LeftButton")
+    T.eq(f.page, "DECORATION")
+    T.ok(f.leftList.rows[1] and f.leftList.rows[1]:IsShown(), "칸이 있는 장비가 보임")
+    f.leftList.rows[1]:Click("LeftButton")
+    f.rightList.rows[1]:Click("LeftButton")
+    T.ok(f.go.enabled)
+    f.go:Click("LeftButton")
+    local entry = s.inventory.items[#s.inventory.items]
+    T.ok(entry.added and #entry.added == 1, "능력치가 붙음")
+    -- 기원
+    Cube.unlock(s, Cube.find("OFFERING"))
+    s.materials[160001] = 1
+    f.recipes[7]:Click("LeftButton")
+    f.leftList.rows[1]:Click("LeftButton")
+    f.go:Click("LeftButton")
+    T.eq(s.materials[160001], nil, "주화를 씀")
+    noErrors("큐브 화면")
+end)
+
 T.case("기록 화면: 편성 상태, 최근 기록, 통계", function()
     local s = App.state
     App.addLog("시험용 기록 줄")
@@ -531,7 +583,9 @@ T.case("모든 화면과 띠의 보이는 버튼을 눌러도 오류가 없다",
     for _, h in pairs(s.heroes) do h.level = 60 end
     for _ = 1, 12 do Inventory.add(s, Items.find("HELMET", 1, 1).id) end
     s.chests.normal.list, s.chests.stage.list = { 1, 1, 1 }, { 2, 2 }
-    local order = { "heroes", "bag", "party", "stage", "runes", "records", "modelcheck" }
+    local order = { "heroes", "bag", "party", "stage", "cube", "runes", "records", "modelcheck" }
+    s.cube.level = 40
+    for _, id in ipairs({ 110001, 120001, 130001, 160003, 140001, 140003 }) do s.materials[id] = 12 end
     local clicks = 0
     for round = 1, 3 do
         for _, id in ipairs(order) do

@@ -190,4 +190,4 @@ local function update(f, elapsed)
     paint(f)
 end
 
-UI.screens.records = { label = "기록", order = 6, create = create, refresh = refresh, update = update }
+UI.screens.records = { label = "기록", order = 7, create = create, refresh = refresh, update = update }

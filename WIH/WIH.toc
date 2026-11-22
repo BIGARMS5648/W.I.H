@@ -61,6 +61,7 @@ UI\ScreenBag.lua
 UI\ScreenHeroes.lua
 UI\ScreenParty.lua
 UI\ScreenStage.lua
+UI\ScreenCube.lua
 UI\ScreenRunes.lua
 UI\ScreenRecords.lua
 UI\ScreenSettings.lua

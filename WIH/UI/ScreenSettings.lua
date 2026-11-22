@@ -257,4 +257,4 @@ local function update(f, elapsed)
     refresh(f)
 end
 
-UI.screens.settings = { label = "설정", order = 7, create = create, refresh = refresh, update = update }
+UI.screens.settings = { label = "설정", order = 8, create = create, refresh = refresh, update = update }
