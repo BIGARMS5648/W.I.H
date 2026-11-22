@@ -23,6 +23,12 @@ end
 -- 레벨에 따라 선형으로 커지는 값. {기본, 레벨당} 또는 숫자.
 function WIH.scaled(v, level)
     if type(v) == "table" then
+        if v.values then
+            -- 레벨별 값을 직접 나열한 경우(선형이 아닌 스킬)
+            local lv = level or 1
+            if lv > #v.values then lv = #v.values end
+            return v.values[lv]
+        end
         return v[1] + (v[2] or 0) * ((level or 1) - 1)
     end
     return v

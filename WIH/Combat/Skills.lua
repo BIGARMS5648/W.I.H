@@ -146,8 +146,15 @@ function exec.damage(b, u, eff, L, ctx)
     local target = ctx.target
     local source = u
     if eff.summonHit then
-        source = ctx.slot.summonUnit
-        if not source or not source.alive then return end
+        source = nil
+        for i = 1, #b.units do
+            local o = b.units[i]
+            if o.alive and o.kind == "summon" and o.owner == u and (eff.summonHit == true or o.skillId == eff.summonHit) then
+                source = o
+                break
+            end
+        end
+        if not source then return end
     end
     local owner = u.statOwner or u
     local coef = scaled(eff.coef, L) / 100
@@ -172,6 +179,38 @@ function exec.damage(b, u, eff, L, ctx)
         local copy = {}
         for i = 1, n do copy[i] = targets[i] end
         targets = copy
+    elseif eff.line then
+        -- 시전자에서 사거리 끝까지 일직선 위의 모든 적
+        if not target then return end
+        local dir = target.x >= u.x and 1 or -1
+        local reach = (ctx.slot and ctx.slot.def.range or 1200) * owner:get("SkillRangeExpansion")
+        targets, n = {}, 0
+        for i = 1, #b.units do
+            local o = b.units[i]
+            if o.team ~= u.team and o.alive and not o.noTarget then
+                local d = (o.x - u.x) * dir
+                if d >= 0 and d <= reach then
+                    n = n + 1
+                    targets[n] = o
+                end
+            end
+        end
+    elseif eff.spread then
+        -- 대상 주변의 서로 다른 적에게 한 발씩. 적이 모자라면 남는 발은 주 대상에게.
+        if not target or not target.alive then return end
+        local list, m = T.enemiesAround(b, u, target.x, 600, scratch)
+        targets, n = { target }, 1
+        for i = 1, m do
+            if n >= eff.spread then break end
+            if list[i] ~= target then
+                n = n + 1
+                targets[n] = list[i]
+            end
+        end
+        while n < eff.spread do
+            n = n + 1
+            targets[n] = target
+        end
     else
         if not target or not target.alive then return end
         targets, n = { target }, 1
@@ -214,6 +253,22 @@ function exec.damage(b, u, eff, L, ctx)
     end
     ctx.target = target
 
+    if eff.melee and not eff.area and target and not eff.adjacent then
+        local cleave
+        for i = 1, #u.effects do
+            if u.effects[i].cleave then cleave = u.effects[i].cleave end
+        end
+        if cleave then
+            local list, m = T.enemiesAround(b, u, target.x, ADJACENT_RANGE, scratch)
+            for i = 1, m do
+                if list[i] ~= target then
+                    b:hit(source, list[i], { coef = coef * cleave, elem = elem, melee = true })
+                    break
+                end
+            end
+        end
+    end
+
     if eff.adjacent and target then
         local list, m = T.enemiesAround(b, u, target.x, ADJACENT_RANGE, scratch)
         local done = 0
@@ -252,8 +307,8 @@ function exec.damage(b, u, eff, L, ctx)
         ctx.target = target
     end
 
-    if killed and eff.resetOnKill and ctx.slot then
-        ctx.slot.charge = ctx.slot.def.act.cd or 0
+    if killed and eff.resetOnKill and ctx.slot and ctx.slot.cd then
+        ctx.slot.resetPending = true
     end
 end
 
@@ -314,7 +369,13 @@ local function buffTargets(b, u, eff, ctx)
         return {}
     end
     if who == "allies" then
-        return T.allies(b, u, u.x, eff.radius and areaRadius(u, eff.radius) or nil, not eff.includeSummons, {})
+        local list = T.allies(b, u, u.x, eff.radius and areaRadius(u, eff.radius) or nil, not eff.includeSummons, {})
+        if eff.meleeOnly then
+            for i = #list, 1, -1 do
+                if not list[i].melee then table.remove(list, i) end
+            end
+        end
+        return list
     end
     if who == "summons" then
         local out = {}
@@ -354,6 +415,48 @@ function exec.buff(b, u, eff, L, ctx)
             t.noTarget = true
             e.onExpire = function(_, unit) unit.noTarget = false end
         end
+        if eff.reflect then
+            local r = eff.reflect
+            local coef = scaled(r.coef, L) / 100
+            local left = r.max
+            local owner = t
+            e.triggers = e.triggers or {}
+            e.triggers[#e.triggers + 1] = { r.on == "block" and "onBlock" or "onHitTaken",
+                function(battle, unit, attacker, _, spec)
+                    if not attacker or not attacker.alive or attacker.team == unit.team then return end
+                    if spec and (spec.isDot or spec.isReflect) then return end
+                    if left then
+                        if left <= 0 then return end
+                        left = left - 1
+                    end
+                    battle:hit(owner, attacker, { coef = coef, elem = r.elem, isReflect = true, canCrit = false })
+                end }
+        end
+        if eff.onHitStatus then
+            e.triggers = e.triggers or {}
+            e.triggers[#e.triggers + 1] = { "onHitTaken", function(battle, unit, attacker, _, spec)
+                if attacker and attacker.alive and attacker.team ~= unit.team and spec and spec.melee then
+                    battle:applyStatus(unit, attacker, eff.onHitStatus)
+                end
+            end }
+        end
+        if eff.proc then
+            local chance = scaled(eff.proc.chance, L) / 100
+            local slot = ctx.slot
+            e.triggers = e.triggers or {}
+            e.triggers[#e.triggers + 1] = { "onBasicAttack", function(battle, unit, target)
+                if target.alive and battle.rng:chance(chance) then
+                    Skills.runEffects(battle, unit, eff.proc.effects, L, { slot = slot, target = target })
+                end
+            end }
+        end
+        if eff.extend and t.expires then
+            t.expires = t.expires + scaled(eff.extend, L)
+        end
+        if eff.focus then
+            t.focusTarget = ctx.target
+            e.onExpire = function(_, unit) unit.focusTarget = nil end
+        end
         if eff.ccImmune then
             t.ccImmune = true
             e.onExpire = function(_, unit) unit.ccImmune = false end
@@ -361,7 +464,7 @@ function exec.buff(b, u, eff, L, ctx)
         b:addEffect(t, e)
         if eff.nextHit then
             local n = eff.nextHit
-            t.nextHit = { count = scaled(n.count or 1, L), forceCrit = n.forceCrit, skillOnly = n.skillOnly,
+            t.nextHit = { count = math.floor(scaled(n.count or 1, L) + 1e-9), forceCrit = n.forceCrit, skillOnly = n.skillOnly,
                 critDmg = n.critDmg and scaled(n.critDmg, L) / 100, mult = n.mult and (1 + scaled(n.mult, L) / 100) }
         end
     end
@@ -468,7 +571,7 @@ end
 
 -- 소환. eff.unit: name, kind("follower" | "turret"), hpPct, interval, coef, elem, melee, range, area, dur, max,
 --   moveSpeed, front(주인 바로 앞에 선다). eff.permanent면 상시 유지하고 죽으면 respawn초 뒤 다시 소환.
-local function spawnSummon(b, u, eff, L, slot)
+local function spawnSummon(b, u, eff, L, slot, target)
     local s = eff.unit
     local owner = u
     local maxHp = owner:get("MaxHp") * (s.hpPct or 100) / 100
@@ -478,15 +581,16 @@ local function spawnSummon(b, u, eff, L, slot)
         base = { MaxHp = maxHp, AttackSpeed = 100 / s.interval, MovementSpeed = s.moveSpeed or (follower and 950 or 0),
             Armor = owner:get("Armor"), CastSpeed = 100, CriticalDamage = 1000, DamageDealt = 1000 },
         melee = s.melee, range = s.range or (s.melee and 130 or 900),
-        rank = follower and (owner.rank - 0.5) or (owner.rank + 0.2),
-        x = owner.x + (follower and 20 or 0),
+        rank = (follower and not s.behind) and (owner.rank - 0.5) or (owner.rank + 0.2),
+        x = (eff.atTarget and target and target.x) or (owner.x + ((follower and not s.behind) and 20 or -20)),
         basicElem = s.elem or "Physical", basicDelivery = s.melee and "melee" or "proj",
         basicArea = s.area,
     })
     summon.basicCoef = scaled(s.coef, L) / 100
     summon.sumKind = s.kind
     summon.skillId = slot.def.id
-    summon.ignoreRank = not follower
+    summon.ignoreRank = not follower or eff.atTarget
+    summon.basicStatus = s.status
     if s.dur then summon.expires = b.time + duration(u, s.dur) end
     if s.noTarget then summon.noTarget = true end
     b:addUnit(summon)
@@ -506,7 +610,7 @@ function exec.summon(b, u, eff, L, ctx)
         old.alive = false
         old.expired = true
     end
-    local summon = spawnSummon(b, u, eff, L, slot)
+    local summon = spawnSummon(b, u, eff, L, slot, ctx.target)
     list[#list + 1] = summon
     slot.summonUnit = summon
     if eff.onSpawn then
@@ -557,11 +661,44 @@ function exec.refresh(_, u, _, _, ctx)
     for i = 1, #u.skills do
         local s = u.skills[i]
         if s ~= ctx.slot and s.def.act.type == "cd" then
-            local left = s.def.act.cd - s.charge
+            local left = s.cd - s.charge
             if left > 0 and (not best or left > bestLeft) then best, bestLeft = s, left end
         end
     end
-    if best then best.charge = best.def.act.cd end
+    if best then best.charge = best.cd end
+end
+
+-- 일정 시간 한자리에 유지되는 오라(토템). eff: who, radius, dur, mods
+function exec.aura(b, u, eff, L, ctx)
+    b:addAura({ owner = u, who = eff.who or "allies", radius = areaRadius(u, eff.radius or 800),
+        mods = resolveMods(eff.mods, L), holder = { x = u.x }, expires = b.time + duration(u, scaled(eff.dur, L)),
+        skill = ctx.slot and ctx.slot.def })
+end
+
+-- 채널링. 시전자는 dur 동안 다른 행동을 하지 못하고, every초마다 효과가 실행된다.
+-- eff: dur, every, effects(대상에게), ally(아군 전원에게)
+function exec.channel(b, u, eff, L, ctx)
+    local target = ctx.target
+    local slot = ctx.slot
+    local dur = scaled(eff.dur, L)
+    u.lock = dur
+    local z = { owner = u, team = u.team, x = u.x, radius = 0, dur = dur, every = eff.every or 1, follow = u,
+        requireOwner = true, name = slot and slot.def.name, isChannel = true }
+    z.tick = function(battle, zone)
+        if not u.alive then return end
+        if eff.effects then
+            if target and not target.alive then
+                target = T.nearestEnemy(battle, u, slot and slot.def.range)
+            end
+            if target then
+                Skills.runEffects(battle, u, eff.effects, L, { slot = slot, target = target })
+            end
+        end
+        if eff.ally then
+            Skills.runEffects(battle, u, eff.ally, L, { slot = slot })
+        end
+    end
+    b:addZone(z)
 end
 
 -- 이름으로 등록한 특수 처리
@@ -590,7 +727,7 @@ end
 --   leech = {pct, dotOnly, party, elem}, dotDouble = 확률
 local function installAura(b, u, slot, eff, L)
     local def = slot.def
-    if eff.mods or eff.redirect then
+    if (eff.mods or eff.redirect) and not eff.special then
         local a = { owner = u, who = eff.who or "allies", radius = eff.radius and areaRadius(u, eff.radius) or 1200,
             mods = resolveMods(eff.mods, L), skill = def, includeSummons = eff.includeSummons }
         if eff.redirect then
@@ -720,9 +857,13 @@ end
 
 -- 유닛에 스킬을 장착한다. 오라와 상시 소환은 바로 적용된다.
 function Skills.equip(b, u, def, level)
-    local slot = { def = def, level = level or 1, charge = def.act.cd or 0, count = 0 }
+    local slot = { def = def, level = level or 1, charge = 0, count = 0 }
     u.skills[#u.skills + 1] = slot
     local L = effLevel(u, slot)
+    if def.act.type == "cd" then
+        slot.cd = scaled(def.act.cd, L)
+        slot.charge = slot.cd          -- [독자] 스테이지를 시작할 때 재사용 스킬은 준비된 상태다
+    end
     if def.act.type == "aura" then
         for i = 1, #def.effects do
             local eff = def.effects[i]
@@ -786,7 +927,7 @@ function Skills.update(b, u, canCast)
         local slot = skills[i]
         local act = slot.def.act
         if act.type == "cd" then
-            if slot.charge < act.cd then
+            if slot.charge < slot.cd then
                 if not rate then
                     local owner = u.statOwner or u
                     rate = owner:get("CastSpeed") / (1 - owner:get("CooldownReduction"))
@@ -807,12 +948,18 @@ function Skills.update(b, u, canCast)
     for i = 1, #skills do
         local slot = skills[i]
         local act = slot.def.act
-        if act.type == "cd" and slot.charge >= act.cd - 1e-9 then
+        if act.type == "cd" and slot.charge >= slot.cd - 1e-9 then
             local target = Skills.findTarget(b, u, slot)
             if target then
                 slot.charge = 0
                 Skills.cast(b, u, slot, target)
-                u.lock = CAST_TIME / (u.statOwner or u):get("CastSpeed")
+                if slot.resetPending then
+                    slot.resetPending = nil
+                    slot.charge = slot.cd
+                end
+                -- 채널링처럼 스킬이 더 긴 행동 불가를 걸었으면 그것을 유지한다.
+                local lock = CAST_TIME / (u.statOwner or u):get("CastSpeed")
+                if u.lock < lock then u.lock = lock end
                 return true
             end
         end
@@ -844,10 +991,12 @@ function Skills.basicAttack(b, u, target)
             local list, n = T.enemiesAround(b, u, target.x, areaRadius(u, u.basicArea), {})
             for i = 1, n do
                 b:hit(u, list[i], { coef = coef, elem = u.basicElem, melee = melee, proj = proj, aoe = true, isBasic = true })
+                if u.basicStatus and list[i].alive then b:applyStatus(u, list[i], u.basicStatus) end
             end
         else
             b:hit(u, target, spec)
         end
+        if u.basicStatus and target.alive then b:applyStatus(u, target, u.basicStatus) end
         if cleave then
             local list, n = T.enemiesAround(b, u, target.x, ADJACENT_RANGE, {})
             for i = 1, n do

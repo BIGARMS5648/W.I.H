@@ -11,12 +11,21 @@ local AI = WIH.module("AI")
 local TICK = WIH.TICK
 local MOVE_FACTOR = Battle.MOVE_FACTOR
 local READY = 1 - 1e-9   -- 부동소수점 누적 오차 허용
+local MELEE_STOP = 100   -- [독자] 영웅 쪽 근접 유닛이 대상에게 붙는 거리
 
-local function move(b, u, target, range)
+-- 대상에게 붙을 거리. 영웅 쪽 근접 유닛은 사거리와 상관없이 같은 거리까지 붙는다. 그래야 사거리가 짧은
+-- 근접 영웅도 선두와 같은 자리에 서서 공격할 수 있고, 몬스터의 대상은 편성 순서로 정해진다.
+local function stopDistance(u, range)
+    local stop = range * 0.9
+    if u.team == 1 and u.melee and stop > MELEE_STOP then stop = MELEE_STOP end
+    return stop
+end
+
+local function move(b, u, target, stop)
     local speed = u:get("MovementSpeed") * MOVE_FACTOR * TICK
     if speed <= 0 then return end
     local dir = target.x > u.x and 1 or -1
-    local goal = target.x - dir * range * 0.9
+    local goal = target.x - dir * stop
     local nx = u.x + dir * speed
     if (dir > 0 and nx > goal) or (dir < 0 and nx < goal) then nx = goal end
     if u.team == 1 and dir > 0 and not u.ignoreRank then
@@ -56,18 +65,25 @@ function AI.act(b, u)
     end
     if u.lock > 0 then return end
 
-    local target, dist = T.nearestEnemy(b, u)
+    local target, dist
+    local focus = u.focusTarget
+    if focus and focus.alive and not focus.noTarget then
+        target, dist = focus, math.abs(focus.x - u.x)
+    else
+        target, dist = T.nearestEnemy(b, u)
+    end
     if not target then return end
     local range = u.range
     if u.kind == "hero" then range = range * u:get("SkillRangeExpansion") end
-    if dist <= range then
-        if u.attackCharge >= READY then
-            u.attackCharge = u.attackCharge - 1
-            if u.attackCharge < 0 then u.attackCharge = 0 end
-            Skills.basicAttack(b, u, target)
-        end
-    else
-        move(b, u, target, range)
+    if dist <= range and u.attackCharge >= READY then
+        u.attackCharge = u.attackCharge - 1
+        if u.attackCharge < 0 then u.attackCharge = 0 end
+        Skills.basicAttack(b, u, target)
+    end
+    -- 사거리 안이어도 정해진 거리까지는 계속 붙는다.
+    local stop = stopDistance(u, range)
+    if dist > stop + 0.5 and target.alive then
+        move(b, u, target, stop)
     end
 end
 

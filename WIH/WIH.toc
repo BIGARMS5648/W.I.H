@@ -14,4 +14,11 @@ Combat\Unit.lua
 Combat\Battle.lua
 AI\Targeting.lua
 Combat\Skills.lua
+Combat\Specials.lua
 AI\Act.lua
+Data\Heroes.lua
+Data\Skills_Warrior_Paladin_Hunter.lua
+Data\Skills_Rogue_Priest_Shaman.lua
+Data\Skills_Mage_Warlock_Druid_Tinker.lua
+Data\SkillTools.lua
+Progression\HeroBuild.lua
