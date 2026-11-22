@@ -171,6 +171,70 @@ local function style(scene, t, u, wantModel)
     t.token:SetShown(not t.useModel)
 end
 
+-- 동행 펫: 전투와 무관한 겉모습. 마지막 영웅의 뒤를 따라다닌다. [원작: 배치는 외형용]
+UI.PET_ICONS = { bat = "Ability_Hunter_Pet_Bat", scarab = "INV_Misc_AhnQirajTrinket_01", ember = "Spell_Fire_Fire",
+    construct = "INV_Misc_Gear_08", wisp = "Spell_Nature_WispSplode", whelp_red = "INV_Misc_Head_Dragon_Red",
+    corehound = "Ability_Hunter_Pet_Hyena", whelp_black = "INV_Misc_Head_Dragon_Black", pumpkin = "INV_Misc_Food_59",
+    ghostling = "Ability_Rogue_Disguise" }
+local PET_SIZE = 46
+
+local function petView(scene)
+    local p = CreateFrame("Frame", nil, scene)
+    p:SetSize(PET_SIZE, PET_SIZE)
+    p.view = UI.modelView(p)
+    p.view:SetAllPoints()
+    p.token = UI.icon(p, 18)
+    p.token:SetPoint("BOTTOM", 0, 2)
+    p:EnableMouse(true)
+    p:SetScript("OnEnter", function(self)
+        local pet = self.petId and WIH.Pets.byId[self.petId]
+        if pet then UI.showTooltip(self, { title = pet.name, lines = { { "동행 펫 · " .. WIH.Pets.effectText(pet), C.sub } } }) end
+    end)
+    p:SetScript("OnLeave", UI.hideTooltip)
+    return p
+end
+
+local function placePet(scene, opts, backX, moving, elapsed)
+    local s = App.state
+    local petId = s and s.pets and s.pets.follow
+    local pet = petId and WIH.Pets.byId[petId]
+    local p = scene.petView
+    if not pet or not backX then
+        if p then p:Hide() end
+        return
+    end
+    if not p then p = petView(scene); scene.petView = p end
+    if p.petId ~= petId or p.optModels ~= opts.models or p.optFlip ~= opts.modelFlip then
+        p.petId, p.optModels, p.optFlip = petId, opts.models, opts.modelFlip
+        p.token:set(UI.PET_ICONS[petId])
+        p.useModel, p.runAnim = false, nil
+        if opts.models and pet.npc then
+            local facing = FACING * (opts.modelFlip and -1 or 1)
+            p.view.onFail = function() p.useModel = false; p.token:Show() end
+            p.useModel = p.view:setCreature({ pet.npc }, facing, 1.3) and true or false
+        else
+            p.view:clear()
+        end
+        p.token:SetShown(not p.useModel)
+    end
+    local x = math.max(14, backX - 38)
+    p:ClearAllPoints()
+    p:SetPoint("BOTTOM", scene, "BOTTOMLEFT", x, GROUND + 14)
+    p:SetFrameLevel(scene:GetFrameLevel() + 1)
+    if p.useModel then
+        p.view:update(elapsed or 0)
+        if p.useModel then p.token:SetShown(p.view:isPending()) end
+        if moving then
+            if not p.runAnim then p.runAnim = p.view:pickAnim(UI.ANIM_CHOICES.run) end
+            p.view:setAnim(p.runAnim)
+        else
+            p.view:setAnim(UI.ANIM.stand)
+        end
+    end
+    p:Show()
+end
+Scene.placePet = placePet
+
 local function release(scene, id, t)
     t:Hide()
     t.view:clear()
@@ -407,6 +471,10 @@ function Scene.update(scene, elapsed)
         heroX[u.id] = x
         prev = x
     end
+    -- 동행 펫: 맨 뒤 영웅의 뒤. 선두가 움직이면 달린다.
+    local moving = scene.petLead ~= nil and math.abs(lead - scene.petLead) > 0.01
+    scene.petLead = lead
+    placePet(scene, opts, prev, moving, elapsed)
 
     local seen = {}
     local pos = scene.pos

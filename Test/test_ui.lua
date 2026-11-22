@@ -473,6 +473,31 @@ T.case("성장 화면(룬): 구매가 골드와 룬 레벨에 반영된다", fun
     noErrors("성장 화면")
 end)
 
+T.case("펫: 성장 화면에서 동행을 고르면 사냥 띠에 영웅 뒤를 따라 나타나고, 풀면 사라진다", function()
+    local s = App.state
+    local Pets = WIH.Pets
+    s.pets.owned.bat = true
+    local f = open("runes")
+    for _, b in ipairs(f.seg.buttons) do if b.id == "pet" then b:Click("LeftButton") end end
+    local row
+    for _, r in ipairs(f.petView.rows) do if r.pet.id == "bat" then row = r end end
+    T.ok(row.follow:IsShown(), "가진 펫에는 동행 버튼")
+    row.follow:Click("LeftButton")
+    T.eq(s.pets.follow, "bat")
+    Strip.saved().hidden, Strip.saved().collapsed = false, false
+    Strip.refresh()
+    Stub.advance(2, 0.05)
+    local scene = Strip.scene
+    T.ok(scene.petView and scene.petView:IsShown(), "띠에 동행 펫이 보임")
+    T.eq(scene.petView.petId, "bat")
+    row.follow:Click("LeftButton")
+    T.eq(s.pets.follow, nil)
+    Stub.advance(1, 0.05)
+    T.ok(not scene.petView:IsShown(), "동행을 풀면 사라짐")
+    for _, b in ipairs(f.seg.buttons) do if b.id == "rune" then b:Click("LeftButton") end end
+    noErrors("동행 펫")
+end)
+
 T.case("성장 화면(유물): 기원으로 얻고, 장착하고, 칸에 끼워 공명시키고, 조율·적용한다", function()
     local s = App.state
     local Relics, Cube, Rng = WIH.Relics, WIH.Cube, WIH.Rng

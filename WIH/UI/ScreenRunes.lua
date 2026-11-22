@@ -272,10 +272,7 @@ end
 -- 펫
 ------------------------------------------------------------------------
 
-local PET_ICON = { bat = "Ability_Hunter_Pet_Bat", scarab = "INV_Misc_AhnQirajTrinket_01", ember = "Spell_Fire_Fire",
-    construct = "INV_Misc_Gear_08", wisp = "Spell_Nature_WispSplode", whelp_red = "INV_Misc_Head_Dragon_Red",
-    corehound = "Ability_Hunter_Pet_Hyena", whelp_black = "INV_Misc_Head_Dragon_Black", pumpkin = "INV_Misc_Food_59",
-    ghostling = "Ability_Rogue_Disguise" }
+local PET_ICON = UI.PET_ICONS
 
 local function createPets(f)
     local v = UI.panel(f, C.bg)
