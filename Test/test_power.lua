@@ -106,7 +106,7 @@ T.case("모델 대응표: 영웅 30명과 보스 전원에 번호가 있고, 일
             mobs = mobs + 1
         end
     end
-    T.eq(bosses, 168); T.eq(mobs, 135)
+    T.eq(bosses, 168 + 37, "던전·레이드 168 + 원정·낙스라마스 37"); T.eq(mobs, 135 + 18)
     for id in pairs(Models.MONSTERS) do T.ok(Monsters.defs[id], "없는 몬스터 ID: " .. id) end
     -- 소환물: 주인의 직업에 따른 모델
     local owner = { def = Heroes.byId.hun_bm }

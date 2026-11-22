@@ -90,6 +90,21 @@ Models.MONSTERS = {
     mc_sulfuron = 12098, mc_golemagg = 11988, mc_majordomo = 12018, mc_ragnaros = 11502,
     bwl_razorgore = 12435, bwl_vaelastrasz = 13020, bwl_lashlayer = 12017, bwl_firemaw = 11983, bwl_ebonroc = 14601, bwl_flamegor = 11981,
     bwl_chromaggus = 14020, bwl_nefarian = 11583,
+    -- 원정: 줄구룹
+    zg_venoxis = 14507, zg_jeklik = 14517, zg_marli = 14510, zg_thekal = 14509, zg_arlokk = 14515, zg_mandokir = 11382,
+    zg_jindo = 11380, zg_hakkar = 14834,
+    zg_berserker = 11351, zg_shadowhunter = 11339, zg_bat = 14965, zg_witchdoctor = 11831, zg_razzashi = 11371, zg_axe = 11350,
+    -- 원정: 안퀴라즈 폐허
+    aq20_kurinnaxx = 15348, aq20_rajaxx = 15341, aq20_moam = 15340, aq20_buru = 15370, aq20_ayamiss = 15369, aq20_ossirian = 15339,
+    aq20_warrior = 15343, aq20_swarmguard = 15319, aq20_stinger = 15327, aq20_obsidian = 15338, aq20_soldier = 15387, aq20_mage = 15335,
+    -- 원정: 안퀴라즈 사원
+    aq40_skeram = 15263, aq40_bug = 15544, aq40_sartura = 15516, aq40_fankriss = 15510, aq40_viscidus = 15299, aq40_huhuran = 15509,
+    aq40_twins = 15276, aq40_cthun = 15727,
+    aq40_anubisath = 15240, aq40_reaver = 15229, aq40_templar = 15262, aq40_drone = 15233, aq40_obsidian = 15312, aq40_prophet = 15247,
+    -- 낙스라마스
+    nx_anubrekhan = 15956, nx_faerlina = 15953, nx_maexxna = 15952, nx_noth = 15954, nx_heigan = 15936, nx_loatheb = 16011,
+    nx_razuvious = 16061, nx_gothik = 16060, nx_horsemen = 16064, nx_patchwerk = 16028, nx_grobbulus = 15931, nx_gluth = 15932,
+    nx_thaddius = 15928, nx_sapphiron = 15989, nx_kelthuzad = 15990,
 }
 
 -- 번호를 따로 적지 않은 몬스터가 쓰는 유형별 대체 모델
