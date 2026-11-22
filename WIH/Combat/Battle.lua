@@ -444,7 +444,11 @@ end
 function B:heal(src, dst, amount, raw)
     if not dst.alive or amount <= 0 then return 0 end
     if not raw and src then amount = amount * (src.statOwner or src):get("SkillHealIncrease") end
-    if dst.healTakenMult then amount = amount * dst.healTakenMult end
+    local taken = dst:get("HealingTaken")
+    if taken ~= 1 then
+        if taken < 0 then taken = 0 end
+        amount = amount * taken
+    end
     local maxHp = dst:get("MaxHp")
     local before = dst.hp
     dst.hp = dst.hp + amount

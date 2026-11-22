@@ -4,8 +4,23 @@ import sys
 import zipfile
 
 
+def sync_camelot_toc(addon_dir):
+    """포에버는 <애드온>_Camelot.toc 를 우선해서 읽는다(게임 내 확인). 기본 TOC와 내용이 어긋나지 않게 복사해 만든다."""
+    addon = os.path.basename(os.path.normpath(addon_dir))
+    base = os.path.join(addon_dir, addon + ".toc")
+    if not os.path.exists(base):
+        return
+    with open(base, encoding="utf-8") as f:
+        text = f.read()
+    text = text.replace("## X-WIH-TOC: base", "## X-WIH-TOC: camelot")
+    with open(os.path.join(addon_dir, addon + "_Camelot.toc"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
 def build(addon_dir, version, out_dir="dist"):
     addon = os.path.basename(os.path.normpath(addon_dir))
+    if addon != "WIH_EnvCheck":
+        sync_camelot_toc(addon_dir)
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"{addon}-{version}.zip")
     count = 0

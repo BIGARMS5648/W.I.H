@@ -81,6 +81,7 @@ def("HpRegenPerSec", 100, 0, "초당 재생")
 def("HpLeech", 1000, 0, "생명력 흡수")
 def("AddHpPerHit", 1, 0, "타격당 회복")
 def("AddHpPerKill", 1, 0, "처치당 회복")
+def("HealingTaken", 1000, 1000, "받는 회복")          -- 디버프 전용 [독자 표현]
 
 -- 이동, 획득
 def("MovementSpeed", 1, 0, "이동속도")

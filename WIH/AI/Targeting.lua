@@ -169,6 +169,21 @@ function T.countEnemies(b, u, maxDist)
     return n, boss
 end
 
+-- 사거리 안의 무작위 적 하나(전투의 난수를 쓴다). 소환물보다 영웅을 고른다.
+function T.randomEnemy(b, u, maxDist)
+    local units = b.units
+    local list, n = {}, 0
+    for i = 1, #units do
+        local o = units[i]
+        if o.team ~= u.team and targetable(o) and o.kind ~= "summon" and (not maxDist or abs(o.x - u.x) <= maxDist) then
+            n = n + 1
+            list[n] = o
+        end
+    end
+    if n == 0 then return T.nearestEnemy(b, u, maxDist) end
+    return list[b.rng:int(1, n)]
+end
+
 -- 스킬 데이터의 대상 규칙 이름 → 유닛
 function T.pick(b, u, rule, range, radius)
     if rule == nil or rule == "nearest" then
@@ -179,6 +194,8 @@ function T.pick(b, u, rule, range, radius)
         return T.lowestHpRatioEnemy(b, u, range)
     elseif rule == "farthest" then
         return T.farthestEnemy(b, u, range)
+    elseif rule == "random" then
+        return T.randomEnemy(b, u, range)
     elseif rule == "cluster" then
         return (T.densestEnemy(b, u, range, radius or 300))
     elseif rule == "lowestHpAlly" then

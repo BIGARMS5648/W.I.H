@@ -948,10 +948,11 @@ function Skills.update(b, u, canCast)
     for i = 1, #skills do
         local slot = skills[i]
         local act = slot.def.act
-        if act.type == "cd" and slot.charge >= slot.cd - 1e-9 then
+        if act.type == "cd" and slot.charge >= slot.cd - 1e-9 and not slot.spent then
             local target = Skills.findTarget(b, u, slot)
             if target then
                 slot.charge = 0
+                if slot.def.once then slot.spent = true end
                 Skills.cast(b, u, slot, target)
                 if slot.resetPending then
                     slot.resetPending = nil
