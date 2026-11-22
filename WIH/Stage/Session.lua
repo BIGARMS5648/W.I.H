@@ -34,6 +34,7 @@ function Session.new(state, opts)
     WIH.Inventory.ensure(state)
     WIH.Chests.ensure(state)
     WIH.Pets.ensure(state)
+    WIH.Cube.ensure(state)
     return s
 end
 

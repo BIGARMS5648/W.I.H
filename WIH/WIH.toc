@@ -37,6 +37,9 @@ Data\Materials.lua
 Inventory\Items.lua
 Inventory\Inventory.lua
 Inventory\Chests.lua
+Data\CubeTable.lua
+Data\MaterialNames.lua
+Inventory\Cube.lua
 Data\Looks.lua
 Progression\Game.lua
 Data\Runes.lua

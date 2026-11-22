@@ -109,6 +109,11 @@ end
 function Chests.roll(state, tableId, rng)
     local entries = ChestTable.tables[tableId]
     if not entries then return nil end
+    return Chests.rollEntries(state, entries, rng)
+end
+
+-- 가중치 표(ChestTable·CubeTable 형식)에서 하나를 뽑는다.
+function Chests.rollEntries(state, entries, rng)
     local total = 0
     for i = 1, #entries do total = total + entries[i][1] end
     local r = rng:float() * total
@@ -204,8 +209,9 @@ local MATERIAL_KIND = {
 function Chests.materialName(id)
     local def = Materials.defs[id]
     if not def then return "알 수 없는 재료" end
-    return (MATERIAL_KIND[def.kind] or def.kind) .. " (" .. Items.GRADES[def.grade].name .. ")"
+    return def.name or ((MATERIAL_KIND[def.kind] or def.kind) .. " (" .. Items.GRADES[def.grade].name .. ")")
 end
+Chests.MATERIAL_KIND = MATERIAL_KIND
 
 -- 상자를 연 결과의 한 줄 표기
 function Chests.resultText(result)

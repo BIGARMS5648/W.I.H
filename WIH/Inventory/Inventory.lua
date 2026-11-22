@@ -185,6 +185,7 @@ function Inventory.gearSheet(state, heroId)
         local item = entry and Items.byId[entry.id]
         if item then
             for _, mod in ipairs(item.mods) do Sheet.add(sheet, mod[1], mod[2], mod[3]) end
+            for _, a in ipairs(entry.added or {}) do Sheet.add(sheet, a.stat, a.mod, a.value) end
         end
     end
     return sheet

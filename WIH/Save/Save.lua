@@ -165,6 +165,7 @@ function Save.validate(state)
     WIH.Chests.validate(state, notes)
     if WIH.Offline then WIH.Offline.validate(state) end
     WIH.Pets.validate(state)
+    WIH.Cube.validate(state)
 
     local party, seen = {}, {}
     if type(state.party) == "table" then

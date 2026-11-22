@@ -29,6 +29,15 @@ function UI.itemTip(item, entry, compareTo)
     for _, mod in ipairs(item.mods) do
         lines[#lines + 1] = { Items.modText(mod), mod.base and C.text or C.sub }
     end
+    for _, a in ipairs(entry and entry.added or {}) do
+        lines[#lines + 1] = { WIH.Cube.NAMES[a.kind] .. "  " .. Items.modText({ a.stat, a.mod, a.value }), C.shield }
+    end
+    local slots = {}
+    for _, kind in ipairs({ "DECORATION", "ENGRAVING", "INSCRIPTION" }) do
+        local n = WIH.Cube.slots(item, kind)
+        if n > 0 then slots[#slots + 1] = WIH.Cube.NAMES[kind] .. " " .. (entry and WIH.Cube.used(entry, kind) or 0) .. "/" .. n end
+    end
+    if #slots > 0 then lines[#lines + 1] = { "칸  " .. table.concat(slots, " · "), C.dim } end
     if item.slot == "MAIN" or item.slot == "SUB" then
         local users = {}
         for _, hero in ipairs(Heroes.list) do
@@ -104,13 +113,16 @@ local function create(parent)
             local item = Items.byId[entry.id]
             if item and item.grade <= BULK_GRADE then list[#list + 1] = i end
         end
-        local gold, n = Inventory.alchemy(s, list)
+        local gold, n, ups, skipped = WIH.Cube.alchemy(s, list)
         f.selected = nil
-        WIH.Main.notice(n > 0 and (n .. "개를 팔아 " .. UI.number(gold) .. " G를 얻었습니다.") or "팔 것이 없습니다.", C.sub)
+        local msg = n > 0 and (n .. "개를 연금술로 팔아 " .. UI.number(gold) .. " G를 얻었습니다.") or "팔 것이 없습니다."
+        if ups > 0 then msg = msg .. "  큐브 레벨 " .. s.cube.level end
+        if skipped > 0 then msg = msg .. "  (큐브 레벨보다 " .. WIH.Cube.LEVEL_GAP .. "레벨 넘게 높은 장비 " .. skipped .. "개는 남김)" end
+        WIH.Main.notice(msg, C.sub)
         UI.screens.bag.refresh(f)
     end)
     f.bulk:SetPoint("RIGHT", f.buy, "LEFT", -6, 0)
-    f.bulk.tooltip = { title = "일반·고급 팔기", lines = { "가방에 있는 일반·고급 등급 장비를 모두 연금술로 골드로 바꿉니다. 잠근 것과 낀 것은 팔리지 않습니다." } }
+    f.bulk.tooltip = { title = "일반·고급 팔기", lines = { "가방에 있는 일반·고급 등급 장비를 모두 연금술로 골드로 바꿉니다. 큐브 경험치도 얻습니다. 잠근 것과 낀 것은 팔리지 않습니다." } }
     f.bagTitle = UI.text(f, 12, C.text, "RIGHT")
     f.bagTitle:SetPoint("RIGHT", f.bulk, "LEFT", -14, 0)
 
@@ -153,8 +165,8 @@ local function create(parent)
     end)
     f.dLock:SetPoint("LEFT", f.dEquip, "RIGHT", 6, 0)
     f.dSell = UI.button(d, "", 132, 26, function()
-        local _, n = Inventory.alchemy(App.state, { f.selected })
-        if n == 0 then WIH.Main.notice("잠근 아이템은 팔 수 없습니다.", C.bad) end
+        local _, n = WIH.Cube.alchemy(App.state, { f.selected })
+        if n == 0 then WIH.Main.notice("잠근 장비와 큐브 레벨보다 " .. WIH.Cube.LEVEL_GAP .. "레벨 넘게 높은 장비는 팔 수 없습니다.", C.bad) end
         f.selected = nil
         UI.screens.bag.refresh(f)
     end)
@@ -300,7 +312,7 @@ local function paintChests(f)
         local n = Game.raidTokens(s, d)
         if n > 0 then tokens[#tokens + 1] = WIH.Tables.DIFFICULTY_NAMES[d] .. " " .. n end
     end
-    f.extra:SetText(string.format("임시 보관함 %d개  ·  재료 %d개(큐브가 들어오면 쓰입니다)  ·  %s %s", #s.mail, mats, WIH.Raids.TOKEN_NAME,
+    f.extra:SetText(string.format("임시 보관함 %d개  ·  재료 %d개(큐브 탭에서 씁니다)  ·  %s %s", #s.mail, mats, WIH.Raids.TOKEN_NAME,
         #tokens > 0 and table.concat(tokens, ", ") or "없음"))
     f.claim:SetShown(#s.mail > 0)
 end
@@ -395,6 +407,9 @@ local function refresh(f)
         local lines = {}
         for _, mod in ipairs(item.mods) do
             lines[#lines + 1] = (mod.base and "|cffe8e9ec" or "") .. Items.modText(mod) .. (mod.base and "|r" or "")
+        end
+        for _, a in ipairs(entry.added or {}) do
+            lines[#lines + 1] = "|cff8fb2db" .. WIH.Cube.NAMES[a.kind] .. "  " .. Items.modText({ a.stat, a.mod, a.value }) .. "|r"
         end
         local cur = Inventory.equipped(s, heroId, item.slot)
         if cur and Items.usableBy(item, heroId) then
