@@ -12,6 +12,7 @@ local ROW_H = 40
 local FILTERS = { { id = "open", label = "살 수 있는 룬" }, { id = "owned", label = "보유한 룬" }, { id = "all", label = "전체" } }
 
 local nodes = RuneData.nodes
+local Pets = WIH.module("Pets")
 
 local function nodeOpen(s, key)
     local node = nodes[key]
@@ -199,7 +200,13 @@ local function create(parent)
         f.filters[i] = b
     end
     f.count = UI.text(f, 11, C.dim, "RIGHT")
-    f.count:SetPoint("TOPRIGHT", -12, -16)
+    f.count:SetPoint("TOPRIGHT", -232, -16)
+    f.view = "rune"
+    f.seg = UI.segment(f, { { "rune", "룬" }, { "pet", "펫" }, { "relic", "유물" } }, 210, function(id)
+        f.view = id
+        UI.screens.runes.refresh(f)
+    end)
+    f.seg:SetPoint("TOPRIGHT", -12, -8)
 
     -- 왼쪽: 합계
     local side = UI.panel(f, C.panel, true)
@@ -225,6 +232,8 @@ local function create(parent)
     f.empty = UI.text(f, 12, C.dim)
     f.empty:SetPoint("TOPLEFT", f.list, "TOPLEFT", 4, -8)
     f.acc = 0
+    UI.screens.runes.createPets(f)
+    if UI.screens.runes.createRelics then UI.screens.runes.createRelics(f) end
     return f
 end
 
@@ -235,6 +244,14 @@ end
 
 local function refresh(f)
     if not App.state then return end
+    f.seg:pick(f.view)
+    local rune = f.view == "rune"
+    for _, b in ipairs(f.filters) do b:SetShown(rune) end
+    f.count:SetShown(rune)
+    f.petView:SetShown(f.view == "pet")
+    if f.relicView then f.relicView:SetShown(f.view == "relic") end
+    if f.view == "pet" then return UI.screens.runes.paintPets(f) end
+    if f.view == "relic" and UI.screens.runes.paintRelics then return UI.screens.runes.paintRelics(f) end
     if not f.items then rebuild(f) end
     paint(f)
     f.summaryScroll:setHeight((f.summary:GetStringHeight() or 200) + 10)
@@ -245,9 +262,94 @@ local function update(f, elapsed)
     f.acc = f.acc + elapsed
     if f.acc < 0.5 then return end
     f.acc = 0
+    if f.view ~= "rune" then return end
     local s = App.state
     if s and math.floor(s.gold) ~= f.lastGold then paint(f) end
     f.summaryScroll:setHeight((f.summary:GetStringHeight() or 200) + 10)
 end
 
-UI.screens.runes = { label = "성장", order = 6, create = create, refresh = refresh, update = update, paint = paint, onShow = onShow }
+------------------------------------------------------------------------
+-- 펫
+------------------------------------------------------------------------
+
+local PET_ICON = { bat = "Ability_Hunter_Pet_Bat", scarab = "INV_Misc_AhnQirajTrinket_01", ember = "Spell_Fire_Fire",
+    construct = "INV_Misc_Gear_08", wisp = "Spell_Nature_WispSplode", whelp_red = "INV_Misc_Head_Dragon_Red",
+    corehound = "Ability_Hunter_Pet_Hyena", whelp_black = "INV_Misc_Head_Dragon_Black", pumpkin = "INV_Misc_Food_59",
+    ghostling = "Ability_Rogue_Disguise" }
+
+local function createPets(f)
+    local v = UI.panel(f, C.bg)
+    v:SetPoint("TOPLEFT", 0, -40)
+    v:SetPoint("BOTTOMRIGHT", 0, 0)
+    v:SetFrameLevel(f:GetFrameLevel() + 20)
+    v:Hide()
+    f.petView = v
+    v.summary = UI.paragraph(v, 12, C.text)
+    v.summary:SetPoint("TOPLEFT", 14, -6)
+    v.summary:SetPoint("TOPRIGHT", -14, -6)
+    v.rows = {}
+    for i, pet in ipairs(Pets.list) do
+        local row = UI.panel(v, C.panel, true)
+        row:SetSize(452, 76)
+        local col, r = (i - 1) % 2, math.floor((i - 1) / 2)
+        row:SetPoint("TOPLEFT", 14 + col * 462, -48 - r * 82)
+        row.icon = UI.icon(row, 40, PET_ICON[pet.id])
+        row.icon:SetPoint("TOPLEFT", 10, -10)
+        row.name = UI.text(row, 13, C.text)
+        row.name:SetPoint("TOPLEFT", 60, -10)
+        row.effect = UI.text(row, 11, C.good)
+        row.effect:SetPoint("TOPLEFT", 60, -30)
+        row.cond = UI.text(row, 10, C.dim)
+        row.cond:SetPoint("TOPLEFT", 60, -48)
+        row.bar = UI.bar(row, 200, 3, C.exp)
+        row.bar:SetPoint("TOPLEFT", 60, -64)
+        row.follow = UI.button(row, "동행", 64, 22, function()
+            local s = App.state
+            local id = s.pets.follow ~= pet.id and pet.id or nil
+            local ok, why = Pets.setFollow(s, id)
+            if not ok then WIH.Main.notice(why, C.bad) end
+            UI.screens.runes.paintPets(f)
+        end)
+        row.follow:SetPoint("BOTTOMRIGHT", -10, 10)
+        row.follow.tooltip = { title = "동행", lines = { "사냥 띠에서 영웅을 따라다닙니다. 겉모습일 뿐이고, 펫의 효과는 가지고 있기만 하면 모두 적용됩니다." } }
+        row.pet = pet
+        v.rows[i] = row
+    end
+end
+
+local function paintPets(f)
+    local s = App.state
+    local v = f.petView
+    local owned, sum = 0, {}
+    for _, pet in ipairs(Pets.list) do
+        if Pets.owned(s, pet.id) then
+            owned = owned + 1
+            for stat, val in pairs(pet.mods) do sum[stat] = (sum[stat] or 0) + val end
+        end
+    end
+    local parts = {}
+    for _, stat in ipairs({ "IncreaseExpAmount", "IncreaseGoldAmount", "DropChanceNormalChestPercent", "DropChanceStageBossChestPercent" }) do
+        if sum[stat] then parts[#parts + 1] = Runes.label(stat) .. " +" .. (sum[stat] / 10) .. "%" end
+    end
+    v.summary:SetText(string.format("펫 %d / %d   ·   가지고 있는 펫의 효과는 모두 겹쳐서 늘 적용됩니다.\n%s", owned, #Pets.list,
+        #parts > 0 and ("|cff6fb07f합계  " .. table.concat(parts, "  ·  ") .. "|r") or "|cff666b74아직 얻은 펫이 없습니다.|r"))
+    for _, row in ipairs(v.rows) do
+        local pet = row.pet
+        local has = Pets.owned(s, pet.id)
+        local have, need = Pets.progress(s, pet)
+        row.name:SetText(pet.name)
+        row.name:SetTextColor(UI.rgb(has and C.text or C.sub))
+        row.effect:SetText(Pets.effectText(pet))
+        row.effect:SetTextColor(UI.rgb(has and C.good or C.dim))
+        row.cond:SetText(has and "얻음" or (Pets.conditionText(pet) .. "   " .. UI.number(have) .. " / " .. UI.number(need)))
+        row.bar:set(has and 1 or have / need)
+        row.icon.tex:SetDesaturated(not has)
+        row.icon:SetAlpha(has and 1 or 0.5)
+        row.follow:SetShown(has)
+        row.follow:setSelected(s.pets.follow == pet.id)
+        row.follow:setText(s.pets.follow == pet.id and "동행 중" or "동행")
+    end
+end
+
+UI.screens.runes = { label = "성장", order = 6, create = create, refresh = refresh, update = update, paint = paint, onShow = onShow,
+    createPets = createPets, paintPets = paintPets }
