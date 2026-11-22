@@ -268,6 +268,7 @@ function Inventory.gearSheet(state, heroId)
         if item then
             for _, mod in ipairs(item.mods) do Sheet.add(sheet, mod[1], mod[2], mod[3]) end
             for _, a in ipairs(entry.added or {}) do Sheet.add(sheet, a.stat, a.mod, a.value) end
+            if item.unique and WIH.Uniques then WIH.Uniques.addToSheet(sheet, item.unique) end
         end
     end
     return sheet

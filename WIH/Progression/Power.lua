@@ -74,7 +74,7 @@ function Power.measure(state, heroId, stageKey)
     local account = WIH.Runes.sheet(state)
     local b = Battle.new({ seed = 77, stageLevel = stage.level, resistPenalty = Tables.RESIST_PENALTY[math.floor(stageKey / 1000)] })
     local u = HeroBuild.spawn(b, heroId, { form = entry.form, passivePoints = entry.passivePoints, skills = entry.skills,
-        gear = entry.gear, account = account, rank = 1, x = 0 })
+        gear = entry.gear, account = account, rank = 1, x = 0, uniques = entry.uniques })
     -- 적 허수아비: 때리지 않고 죽지 않는다.
     b:addUnit(Unit.new({ name = "허수아비", team = 2, kind = "monster", isBoss = true,
         base = { MaxHp = 1e12, AttackSpeed = 0, MovementSpeed = 0, CriticalDamage = 1000 },

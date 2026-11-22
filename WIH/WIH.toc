@@ -38,6 +38,8 @@ Data\ItemTypes.lua
 Data\ChestTable.lua
 Data\Materials.lua
 Inventory\Items.lua
+Data\UniqueTable.lua
+Inventory\Uniques.lua
 Data\StashTable.lua
 Inventory\Inventory.lua
 Inventory\Chests.lua

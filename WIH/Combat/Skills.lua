@@ -158,7 +158,8 @@ function exec.damage(b, u, eff, L, ctx)
     end
     local owner = u.statOwner or u
     local coef = scaled(eff.coef, L) / 100
-    local elem = eff.elem or u.basicElem
+    local uq = ctx.slot and ctx.slot.unique           -- 장비 고유 능력치(Inventory/Uniques.lua)
+    local elem = (uq and uq.elem) or eff.elem or u.basicElem
     local hits = scaled(eff.hits or 1, L)
     if not eff.area and not eff.noMultistrike then
         hits = hits + owner:get("Multistrike")
@@ -166,6 +167,7 @@ function exec.damage(b, u, eff, L, ctx)
     if eff.proj and eff.multiProj then
         hits = hits + owner:get("ProjectileCount")
     end
+    if uq and uq.extraHits then hits = hits + uq.extraHits end
 
     local targets, n
     if eff.area then
@@ -227,6 +229,12 @@ function exec.damage(b, u, eff, L, ctx)
             if eff.execute then
                 spec.mult = (spec.mult or 1) * (1 + (1 - t:hpRatio()) * eff.execute)
             end
+            if uq then
+                if uq.power then spec.mult = (spec.mult or 1) * uq.power end
+                if uq.mult then spec.mult = (spec.mult or 1) * uq.mult end
+                if uq.vs and t:hasStatus(uq.vs.status) then spec.mult = (spec.mult or 1) * uq.vs.mult end
+                if uq.leech then spec.leech = (spec.leech or 0) + owner:get("HpLeech") * uq.leech end
+            end
             if eff.bonusIf then
                 local c = eff.bonusIf
                 local ok = true
@@ -243,8 +251,23 @@ function exec.damage(b, u, eff, L, ctx)
             applyBonuses(source, t, spec)
             consumeNext(owner, spec, true)
             local wasAlive = t.alive
-            b:hit(source, t, spec)
+            local dealt = b:hit(source, t, spec)
             if wasAlive and not t.alive then killed = true end
+            if uq then
+                if uq.status and t.alive and b.rng:chance(uq.status.chance) then b:applyStatus(source, t, uq.status.status) end
+                if uq.critCdr and b.lastCrit and ctx.slot.cd then
+                    ctx.slot.charge = math.min(ctx.slot.cd, ctx.slot.charge + uq.critCdr)
+                end
+                if uq.heal and dealt > 0 then
+                    local low = T.lowestAlly and T.lowestAlly(b, owner)
+                    if not low then
+                        for _, o in ipairs(b.units) do
+                            if o.team == owner.team and o.alive and o.kind == "hero" and (not low or o:hpRatio() < low:hpRatio()) then low = o end
+                        end
+                    end
+                    if low then b:heal(owner, low, dealt * uq.heal) end
+                end
+            end
         end
         if eff.apply and t.alive then
             ctx.target = t
@@ -307,7 +330,7 @@ function exec.damage(b, u, eff, L, ctx)
         ctx.target = target
     end
 
-    if killed and eff.resetOnKill and ctx.slot and ctx.slot.cd then
+    if killed and ctx.slot and ctx.slot.cd and (eff.resetOnKill or (uq and uq.killReset)) then
         ctx.slot.resetPending = true
     end
 end
@@ -497,7 +520,8 @@ function exec.dot(b, u, eff, L, ctx)
     b:addEffect(t, { id = eff.id or ("dot:" .. (ctx.slot and ctx.slot.def.id or "?")), kind = "dot", src = u,
         harmful = true, dur = scaled(eff.dur, L), perSource = true, maxStacks = eff.maxStacks,
         addStacks = eff.stacks, stacks = eff.stacks or 1,
-        dot = { elem = eff.elem or "Chaos", coef = perTick, mult = mult }, skill = ctx.slot and ctx.slot.def })
+        dot = { elem = (ctx.slot and ctx.slot.unique and ctx.slot.unique.elem) or eff.elem or "Chaos", coef = perTick, mult = mult },
+        skill = ctx.slot and ctx.slot.def })
 end
 
 -- 지면 영역. eff: r, dur, every, at("self" | "target" | "cluster"), follow, absorb,
@@ -506,8 +530,11 @@ function exec.zone(b, u, eff, L, ctx)
     local cx = u.x
     if eff.at ~= "self" and ctx.target then cx = ctx.target.x end
     local slot = ctx.slot
+    local owner = u.statOwner or u
     local z = { owner = u, team = u.team, x = cx, radius = areaRadius(u, eff.r), dur = duration(u, scaled(eff.dur, L)),
-        every = eff.every or 1, follow = eff.follow and u or nil, absorb = eff.absorb and scaled(eff.absorb, L) or nil,
+        every = eff.every or 1, follow = (eff.follow or owner.uniqueZoneFollow) and u or nil,
+        absorb = eff.absorb and scaled(eff.absorb, L) * (1 + (owner.uniqueZoneAbsorb or 0)) or nil,
+        dr = eff.ally and owner.uniqueZoneDR or nil,
         name = slot and slot.def.name, requireOwner = eff.requireOwner }
     z.tick = function(battle, zone)
         if not u.alive and not eff.persist then return end
@@ -545,7 +572,7 @@ function exec.trap(b, u, eff, L, ctx)
     for i = #traps, 1, -1 do
         if traps[i].done then table.remove(traps, i) end
     end
-    if #traps >= (eff.max or 1) then
+    if #traps >= (eff.max or 1) + ((slot.unique and slot.unique.trapBonus) or 0) then
         traps[1].expires = b.time
         traps[1].done = true
         table.remove(traps, 1)
@@ -934,9 +961,9 @@ function Skills.cast(b, u, slot, target)
     end
 end
 
-local function skillRange(u, def)
+local function skillRange(u, def, slot)
     local r = def.range or (u.range + 50)
-    return r * (u.statOwner or u):get("SkillRangeExpansion")
+    return r * (u.statOwner or u):get("SkillRangeExpansion") * ((slot and slot.unique and slot.unique.range) or 1)
 end
 
 -- 대상 규칙에 따라 대상을 찾고 사용 조건을 확인한다. 쓸 수 있으면 대상을 돌려준다.
@@ -954,7 +981,7 @@ function Skills.findTarget(b, u, slot)
             target = T.pick(b, u, rule)
         end
     else
-        target = T.pick(b, u, rule, skillRange(u, def), def.clusterRadius)
+        target = T.pick(b, u, rule, skillRange(u, def, slot), def.clusterRadius)
     end
     if not target then return nil end
     if not Skills.condition(b, u, def.cond, target) then return nil end
@@ -1094,6 +1121,13 @@ function Skills.basicAttack(b, u, target)
 
     runTriggers(b, u, "onBasicAttack", target)
 
+    -- 장비 고유 능력치: 기본 공격 때 확률로 스킬 발동(재사용 대기와 무관)
+    if u.uniqueBasicCast and target.alive then
+        for _, c in ipairs(u.uniqueBasicCast) do
+            if b.rng:chance(c.chance) then Skills.cast(b, u, c.slot, target) end
+        end
+    end
+
     -- "기본공격 N회마다" 스킬
     local skills = u.skills
     for i = 1, #skills do
@@ -1101,7 +1135,7 @@ function Skills.basicAttack(b, u, target)
         local act = slot.def.act
         if act.type == "count" then
             slot.count = slot.count + 1
-            local need = act.n - owner:get("BaseAttackCountReduction")
+            local need = act.n - owner:get("BaseAttackCountReduction") - ((slot.unique and slot.unique.countReduce) or 0)
             if need < 1 then need = 1 end
             if slot.count >= need then
                 local t = Skills.findTarget(b, u, slot)

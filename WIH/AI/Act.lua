@@ -21,8 +21,36 @@ local function stopDistance(u, range)
     return stop
 end
 
+-- 파티 이동 [원작]: 적에게 다가가는 동안(멀리 있을 때) 영웅은 가장 느린 파티원의 속도로 함께 움직인다.
+-- 장비 고유 능력치가 규칙을 바꾼다(가장 빠른 / 평균 / 자신을 뺀 가장 느린).
+local PACE_DISTANCE = 400      -- [독자] 이보다 멀리 있는 적에게 다가갈 때만 파티 속도를 쓴다
+local function partyPace(b)
+    if b.paceTick == b.tickCount then return b.pace end
+    b.paceTick = b.tickCount
+    local rule, owner = b.paceRule or "slowest", b.paceOwner
+    local lo, hi, sum, n = nil, nil, 0, 0
+    for _, o in ipairs(b.units) do
+        if o.alive and o.kind == "hero" and not (rule == "exceptSelf" and o == owner) then
+            local ms = o:get("MovementSpeed")
+            lo = (not lo or ms < lo) and ms or lo
+            hi = (not hi or ms > hi) and ms or hi
+            sum, n = sum + ms, n + 1
+        end
+    end
+    if n == 0 then b.pace = nil
+    elseif rule == "fastest" then b.pace = hi
+    elseif rule == "average" then b.pace = sum / n
+    else b.pace = lo end
+    return b.pace
+end
+
 local function move(b, u, target, stop)
-    local speed = u:get("MovementSpeed") * MOVE_FACTOR * TICK
+    local ms = u:get("MovementSpeed")
+    if u.kind == "hero" and math.abs(target.x - u.x) > PACE_DISTANCE then
+        local pace = partyPace(b)
+        if pace and ms > 0 then ms = pace end
+    end
+    local speed = ms * MOVE_FACTOR * TICK
     if speed <= 0 then return end
     local dir = target.x > u.x and 1 or -1
     local goal = target.x - dir * stop

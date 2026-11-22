@@ -160,7 +160,7 @@ local function createMid(f)
                 if not item then
                     return { title = Items.SLOT_NAMES[slot], lines = { "비어 있습니다.", { "왼쪽 클릭: 가방에서 고르기", C.dim } } }
                 end
-                local tip = UI.itemTip(item, entry)
+                local tip = UI.itemTip(item, entry, nil, f.heroId)
                 tip.lines[#tip.lines + 1] = { "왼쪽 클릭: 가방에서 바꾸기 · 오른쪽 클릭: 해제", C.dim }
                 return tip
             end

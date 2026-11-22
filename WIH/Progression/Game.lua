@@ -267,7 +267,7 @@ function Game.heroEntry(state, heroId)
         skills[#skills + 1] = { id, h.active[id] or 1 }
     end
     return { heroId = heroId, form = h.form, level = h.level, passivePoints = h.passive, skills = skills,
-        heroState = h, gear = WIH.Inventory.gearSheet(state, heroId) }
+        heroState = h, gear = WIH.Inventory.gearSheet(state, heroId), uniques = WIH.Uniques.collect(state, heroId) }
 end
 
 function Game.buildParty(state)

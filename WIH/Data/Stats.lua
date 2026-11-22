@@ -65,6 +65,7 @@ def("MaxFireResistance", 1, 75, "최대 화염 저항")
 def("MaxColdResistance", 1, 75, "최대 냉기 저항")
 def("MaxLightningResistance", 1, 75, "최대 번개 저항")
 def("MaxChaosResistance", 1, 75, "최대 암흑 저항")
+def("MaxAllElementalResistance", 1, 0, "최대 원소 저항")      -- 화염·냉기·번개의 최대 저항에 더한다 [원작 고유 능력치]
 def("DodgeChance", 1000, 0, "회피")
 def("ElementalDodgeChance", 1000, 0, "원소 회피")
 def("MaxDodgeChance", 1000, 750, "최대 회피")

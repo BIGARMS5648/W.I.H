@@ -73,6 +73,10 @@ function HeroBuild.spawn(b, heroId, opts)
             Skills.equip(b, u, def, s[2] or s.level or 1)
         end
     end
+    if opts.uniques and #opts.uniques > 0 then
+        u.uniques = opts.uniques
+        WIH.Uniques.install(b, u, opts.uniques)
+    end
     return u
 end
 

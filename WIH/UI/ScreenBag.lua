@@ -23,12 +23,13 @@ local GROUP = { MAIN = "MAIN", SUB = "SUB", HELMET = "ARMOR", ARMOR = "ARMOR", G
 local function gradeColor(item) return Items.GRADES[item.grade].color end
 
 -- 아이템 툴팁의 내용. compareTo가 있으면 지금 낀 것을 덧붙인다.
-function UI.itemTip(item, entry, compareTo)
+function UI.itemTip(item, entry, compareTo, heroId)
     local lines = {}
     lines[#lines + 1] = { Items.gradeName(item) .. "  ·  " .. Items.SLOT_NAMES[item.slot] .. "  ·  아이템 레벨 " .. item.level, gradeColor(item) }
     for _, mod in ipairs(item.mods) do
         lines[#lines + 1] = { Items.modText(mod), mod.base and C.text or C.sub }
     end
+    if item.unique then lines[#lines + 1] = { "고유: " .. WIH.Uniques.text(item.unique, heroId), C.warn } end
     for _, a in ipairs(entry and entry.added or {}) do
         lines[#lines + 1] = { WIH.Cube.NAMES[a.kind] .. "  " .. Items.modText({ a.stat, a.mod, a.value }), C.shield }
     end
@@ -331,7 +332,7 @@ local function cell(f, n)
         local entry = s and index and source(f, s)[index]
         local item = entry and Items.byId[entry.id]
         if not item then return nil end
-        return UI.itemTip(item, entry, Inventory.equipped(s, target(f), item.slot))
+        return UI.itemTip(item, entry, Inventory.equipped(s, target(f), item.slot), target(f))
     end
     f.cells[n] = c
     return c
@@ -491,6 +492,7 @@ local function refresh(f)
         for _, a in ipairs(entry.added or {}) do
             lines[#lines + 1] = "|cff8fb2db" .. WIH.Cube.NAMES[a.kind] .. "  " .. Items.modText({ a.stat, a.mod, a.value }) .. "|r"
         end
+        if item.unique then lines[#lines + 1] = "|cffd9b05e고유  " .. WIH.Uniques.text(item.unique, heroId) .. "|r" end
         local cur = Inventory.equipped(s, heroId, item.slot)
         if cur and Items.usableBy(item, heroId) then
             lines[#lines + 1] = ""

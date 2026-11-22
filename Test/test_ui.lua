@@ -421,6 +421,21 @@ T.case("가방 화면: 장착 대상, 잠금, 팔기, 칸 구매, 상자", funct
     f.chestToggle:Click("LeftButton")
     T.eq(f.chestRows[1].kind, "normal")
     T.ok(UI.itemTip(Items.find("SWORD", 1, 1), nil, Items.find("STAFF", 1, 1)).title ~= nil)
+    -- 고유 능력치가 있는 장비: 상세와 툴팁에 보인다
+    local uid
+    for id in pairs(WIH.Uniques.byItem) do uid = id; break end
+    s.inventory.items = {}
+    Inventory.add(s, uid)
+    f.filter = "all"
+    UI.screens.bag.refresh(f)
+    f.cells[1]:Click("LeftButton")
+    T.ok(f.dBody:GetText():find("고유"), "상세에 고유 능력치")
+    local tip = f.cells[1].tooltip()
+    local hasUnique = false
+    for _, l in ipairs(tip.lines) do if type(l) == "table" and l[1]:find("^고유") then hasUnique = true end end
+    T.ok(hasUnique, "툴팁에 고유 능력치")
+    f.selected = nil
+    UI.screens.bag.refresh(f)
     noErrors("가방 화면")
 end)
 

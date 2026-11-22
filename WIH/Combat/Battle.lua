@@ -271,6 +271,7 @@ function B:hit(src, dst, spec)
         dmg = dmg + off:get("DamageAddition") + off:get(elem .. "DamageAddition")
     end
     dmg = dmg * (1 + dst:get("TakenAll") + dst:get("Taken" .. elem))
+    self.lastCrit = crit
     return self:receive(src, dst, dmg, elem, spec, crit)
 end
 
@@ -313,9 +314,14 @@ function B:receive(src, dst, dmg, elem, spec, crit)
         dmg = dmg * (1 - Battle.armorReduction(dst:get("Armor"), dmg, self.stageLevel, dst.melee))
     else
         local res = dst:get(elem .. "Resistance")
+        local rule = dst.resistRule              -- 장비 고유 능력치: 가장 높은 원소 저항을 쓴다
+        if rule and (elem ~= "Chaos" and rule == "unify" or elem == "Chaos" and rule == "chaos") then
+            res = math.max(dst:get("FireResistance"), dst:get("ColdResistance"), dst:get("LightningResistance"))
+        end
         if elem ~= "Chaos" then res = res + dst:get("AllElementalResistance") end
         if dst.team == 1 then res = res - self.resistPenalty end
         local maxRes = dst:get("Max" .. elem .. "Resistance")
+        if elem ~= "Chaos" then maxRes = maxRes + dst:get("MaxAllElementalResistance") end
         if res > maxRes then res = maxRes end
         dmg = dmg * (1 - res / 100)
     end
@@ -329,6 +335,11 @@ function B:receive(src, dst, dmg, elem, spec, crit)
     if not spec.isDot then
         local absorb = dst:get("DamageAbsorption") + self:zoneAbsorb(dst)
         dmg = dmg - absorb
+    end
+    if dst.team == 1 and #self.zones > 0 then dmg = dmg * (1 - self:zoneDR(dst)) end
+    if dst.hitCap then
+        local cap = dst:get("MaxHp") * dst.hitCap
+        if dmg > cap then dmg = cap end
     end
     if dmg < 1 then dmg = 1 end
 
@@ -403,6 +414,22 @@ function B:redirect(src, dst, dmg, elem, spec)
             elseif r.mode == "toSummon" then
                 receiver = a.currentSummon
                 applies = owner == dst and receiver ~= nil and receiver.alive
+            elseif r.mode == "share" then
+                -- 받는 피해를 다른 파티원이 나눠 받는다(장비 고유 능력치)
+                if owner == dst then
+                    local others = {}
+                    for _, o in ipairs(self.units) do
+                        if o.alive and o.team == dst.team and o ~= dst and o.kind == "hero" then others[#others + 1] = o end
+                    end
+                    if #others > 0 then
+                        local pct = r.pct
+                        if redirected + pct > REDIRECT_CAP then pct = REDIRECT_CAP - redirected end
+                        redirected = redirected + pct
+                        for _, o in ipairs(others) do
+                            self:receive(src, o, dmg * pct / #others, elem, { redirected = true, noAvoid = true, isDot = spec.isDot })
+                        end
+                    end
+                end
             end
             if applies then
                 local pct = r.pct
@@ -428,6 +455,16 @@ function B:zoneAbsorb(dst)
         end
     end
     return total
+end
+
+-- 대상이 서 있는 아군 영역이 주는 피해 감소(장비 고유 능력치). 가장 큰 것 하나만.
+function B:zoneDR(dst)
+    local best = 0
+    for i = 1, #self.zones do
+        local z = self.zones[i]
+        if z.dr and z.team == dst.team and math.abs(z.x - dst.x) <= z.radius and z.dr > best then best = z.dr end
+    end
+    return best > 0.75 and 0.75 or best
 end
 
 function B:lethal(src, dst, spec)
@@ -460,6 +497,10 @@ function B:kill(src, dst)
     dst.hp = 0
     dst.stats.deaths = dst.stats.deaths + 1
     dst.diedAt = self.time
+    -- 죽을 때 걸려 있던 상태 이상(처치 조건 효과가 본다)
+    local had = {}
+    for i = 1, #dst.effects do if dst.effects[i].status then had[dst.effects[i].status] = true end end
+    dst.diedWith = had
     -- 효과 정리. onExpire는 부르지 않는다.
     for i = #dst.effects, 1, -1 do
         self:removeEffect(dst, dst.effects[i], true)

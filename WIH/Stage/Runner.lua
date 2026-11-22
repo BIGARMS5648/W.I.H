@@ -64,11 +64,12 @@ function Runner.new(opts)
     r.heroes = {}
     for rank, p in ipairs(opts.party) do
         local u = HeroBuild.spawn(r.battle, p.heroId, { form = p.form, passivePoints = p.passivePoints, skills = p.skills,
-            gear = p.gear, account = opts.account, rank = rank, x = -(rank - 1) * 20 })
+            gear = p.gear, account = opts.account, rank = rank, x = -(rank - 1) * 20, uniques = p.uniques })
         u.state = p
         r.heroes[rank] = u
         r.totals.exp[rank] = 0
     end
+    WIH.Uniques.installParty(r.battle, r.heroes)
     return r
 end
 
