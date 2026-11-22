@@ -1,6 +1,6 @@
 -- 보물상자: 드롭, 획득 허용량, 보관, 개봉. 아이템은 모두 상자에서 나온다. [원작]
 -- 저장 형태: state.chests[종류] = { list = { 표 번호, ... }, allowance = 허용량, auto = 자동 개봉까지 흐른 시간(초) }
--- 종류: normal(일반 몬스터가 주는 일반 상자), stage(스테이지 보스가 주는 스테이지 상자)
+-- 종류: normal(일반 몬스터가 주는 일반 상자), stage(스테이지 보스가 주는 스테이지 상자), raid(레이드를 클리어하면 받는 상자)
 
 local _, WIH = ...
 local Tables = WIH.module("Tables")
@@ -11,8 +11,8 @@ local Materials = WIH.module("Materials")
 local Inventory = WIH.module("Inventory")
 local Chests = WIH.module("Chests")
 
-Chests.KINDS = { "normal", "stage" }
-Chests.NAMES = { normal = "일반 상자", stage = "스테이지 상자" }
+Chests.KINDS = { "normal", "stage", "raid" }
+Chests.NAMES = { normal = "일반 상자", stage = "스테이지 상자", raid = "레이드 상자" }
 Chests.BASE_CAP = 5             -- [추정] 룬이 없을 때의 보관 한도
 Chests.ALLOWANCE_CAP = 2        -- [독자] 허용량의 누적 한도. 원작의 한도는 확인되지 않았다
 Chests.START_ALLOWANCE = 1      -- [독자] 새 게임은 허용량 1에서 시작한다
@@ -23,6 +23,8 @@ local RUNE = {
         reduce = "ReduceAutoOpenNormalChestTime", rate = "chest", table = "normal", cool = "cool" },
     stage = { cap = "MaxAmountStageBossChest", chance = "DropChanceStageBossChestPercent", auto = "UnlockAutoOpenStageBossChest",
         reduce = "ReduceAutoOpenStageBossChestTime", rate = "bossChest", table = "boss", cool = "bossCool" },
+    -- 레이드 상자는 확률이나 허용량이 아니라 입장 재료로 제한된다. 클리어하면 반드시 하나를 받는다. [원작]
+    raid = { cap = "MaxAmountActBossChest", auto = "UnlockAutoOpenActBossChest", reduce = "ReduceAutoOpenActBossChestTime" },
 }
 
 local function runeTotal(state, stat)
@@ -54,7 +56,7 @@ function Chests.count(state, kind) return #state.chests[kind].list end
 -- 상자 드롭 확률(0~1): 스테이지의 확률 × (1 + 룬의 드롭 확률 %) [원작 수치 / 추정: 곱연산]
 function Chests.dropChance(state, kind, stageKey)
     local stage = Tables.STAGES[stageKey]
-    local rate = stage and stage[RUNE[kind].rate]
+    local rate = stage and RUNE[kind].rate and stage[RUNE[kind].rate]
     if not rate then return 0 end
     local p = rate / 1000 * (1 + runeTotal(state, RUNE[kind].chance) / 1000)
     return p > 1 and 1 or p
@@ -77,7 +79,7 @@ end
 -- 돌려주는 값: 받았으면 true. 못 받았으면 false와 사유("chance" | "allowance" | "full")
 function Chests.tryDrop(state, kind, stageKey, rng)
     local info = ChestTable.STAGE[stageKey]
-    local tableId = info and info[RUNE[kind].table]
+    local tableId = info and RUNE[kind].table and info[RUNE[kind].table]
     if not tableId then return false, "chance" end
     if not rng:chance(Chests.dropChance(state, kind, stageKey)) then return false, "chance" end
     local c = state.chests[kind]
@@ -86,6 +88,20 @@ function Chests.tryDrop(state, kind, stageKey, rng)
     c.allowance = c.allowance - 1
     c.list[#c.list + 1] = tableId
     return true
+end
+
+-- 레이드 클리어 보상: 레이드 상자 하나를 보관함에 넣는다. 보관함이 가득 차 있으면 그 자리에서 열어 준다(잃지 않게). [독자]
+-- 돌려주는 값: 보관했으면 "stored", 바로 열었으면 "opened"와 그 결과
+function Chests.giveRaid(state, raidKey, rng)
+    local info = ChestTable.STAGE[raidKey]
+    local tableId = info and info.raid
+    if not tableId then return nil end
+    local c = state.chests.raid
+    c.list[#c.list + 1] = tableId
+    if #c.list > Chests.cap(state, "raid") then
+        return "opened", Chests.open(state, "raid", rng)
+    end
+    return "stored"
 end
 
 -- 표에서 보상 하나를 뽑는다. 돌려주는 값: { item = 아이템 } 또는 { material = 번호 }
@@ -142,7 +158,7 @@ function Chests.tick(state, dt, stageKey, rng, onLoot)
     local info = ChestTable.STAGE[stageKey]
     for _, kind in ipairs(Chests.KINDS) do
         local c = state.chests[kind]
-        local minutes = info and info[RUNE[kind].cool]
+        local minutes = info and RUNE[kind].cool and info[RUNE[kind].cool]
         if minutes and c.allowance < Chests.ALLOWANCE_CAP then
             c.allowance = c.allowance + dt / (minutes * 60)
             if c.allowance > Chests.ALLOWANCE_CAP then c.allowance = Chests.ALLOWANCE_CAP end

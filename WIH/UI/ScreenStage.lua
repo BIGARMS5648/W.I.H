@@ -10,9 +10,9 @@ local Level = WIH.module("Level")
 local Dungeons = WIH.module("Dungeons")
 local Monsters = WIH.module("Monsters")
 local Runes = WIH.module("Runes")
+local Raids = WIH.module("Raids")
 
 local C = UI.C
-local ACT_RAIDS = { "오닉시아의 둥지", "화산 심장부", "검은날개 둥지" }       -- 설계 문서 9절의 대응
 local ARCHETYPE_TEXT = {
     grunt = "근접", soldier = "단단한 근접", brute = "느리고 강한 근접", tank = "체력이 많은 근접", fast = "빠른 근접",
     swarm = "무리", stalker = "공격이 빠른 근접", berserk = "돌진", caster = "원거리 주문", archer = "원거리 물리",
@@ -54,6 +54,7 @@ local function create(parent)
             if sec then
                 local b = UI.button(f.list.content, sec.name, 244, 24, function()
                     f.section = key
+                    f.raidAct = nil
                     UI.screens.stage.refresh(f)
                 end)
                 b:SetPoint("TOPLEFT", 0, -y)
@@ -66,12 +67,19 @@ local function create(parent)
                 y = y + 26
             end
         end
-        -- 레이드(액트 보스 자리)는 아직 들어오지 않았다. 누를 수 없는 안내 줄로만 둔다.
-        local raid = UI.text(f.list.content, 11, C.dim)
-        raid:SetPoint("TOPLEFT", 8, -y - 5)
-        raid:SetText("레이드  ·  " .. ACT_RAIDS[act] .. "  (미구현)")
-        f.raidRows[act] = raid
-        y = y + 28
+        -- 레이드(액트 보스 자리)
+        local rb = UI.button(f.list.content, "레이드 · " .. Raids.byAct[act].name, 244, 24, function()
+            f.raidAct = act
+            UI.screens.stage.refresh(f)
+        end)
+        rb:SetPoint("TOPLEFT", 0, -y)
+        rb.label:ClearAllPoints()
+        rb.label:SetPoint("LEFT", 8, 0)
+        rb.label:SetJustifyH("LEFT")
+        rb.right = UI.text(rb, 11, C.sub, "RIGHT")
+        rb.right:SetPoint("RIGHT", -8, 0)
+        f.raidRows[act] = rb
+        y = y + 32
     end
     f.list:setHeight(y)
 
@@ -83,7 +91,18 @@ local function create(parent)
     f.name:SetPoint("TOPLEFT", 0, 0)
     f.meta = UI.text(d, 12, C.sub)
     f.meta:SetPoint("TOPLEFT", f.name, "BOTTOMLEFT", 0, -6)
-    f.go = UI.button(d, "이 스테이지로 이동", 150, 26, function()
+    f.go = UI.button(d, "이 스테이지로 이동", 190, 26, function()
+        if f.raidAct then
+            local ok, why = Game.startRaid(App.state, f.difficulty, f.raidAct)
+            if not ok then
+                WIH.Main.notice(why, C.bad)
+            else
+                App.restartStage()
+                WIH.Main.notice(Raids.byAct[f.raidAct].name .. " 레이드를 시작했습니다. 전투 화면에서 볼 수 있습니다.", C.good)
+            end
+            UI.screens.stage.refresh(f)
+            return
+        end
         local ok, why = Game.selectStage(App.state, f.difficulty, f.section)
         if not ok then
             WIH.Main.notice(why, C.bad)
@@ -150,6 +169,38 @@ local function detailText(s, difficulty, section)
     return table.concat(lines, "\n")
 end
 
+-- 레이드의 상세: 보스 순서와 이 난이도에서 쓰는 패턴
+local function raidText(s, difficulty, act)
+    local raid = Raids.byAct[act]
+    local stage = Tables.STAGES[Raids.key(difficulty, act)]
+    local lines = {}
+    local function add(t) lines[#lines + 1] = t end
+    local parts = {}
+    for _, id in ipairs(s.party) do
+        local h = s.heroes[id]
+        parts[#parts + 1] = string.format("%s %d%%", Heroes.byId[id].name, Level.expPenalty(h.level, stage.level) * 100 + 0.5)
+    end
+    add("|cffe8e8ea경험치 획득 비율|r  " .. table.concat(parts, "   "))
+    add("")
+    add("|cffe8e8ea진행|r  보스 " .. #raid.bosses .. "명을 차례로 상대합니다. 보스 사이에 체력과 재사용 시간이 이어집니다. 전멸하면 실패이고, 실패하면 "
+        .. Raids.TOKEN_NAME .. "는 쓰이지 않습니다. 클리어하면 레이드 상자 1개를 받습니다.")
+    local count = Raids.skillCount(difficulty)
+    for i, id in ipairs(raid.bosses) do
+        local def = Monsters.defs[id]
+        add("")
+        add(string.format("|cffd9b05e%d. %s|r%s  |cff6b6e75%s 피해 · %s|r", i, def.name, i == #raid.bosses and "  |cff70b880마지막 보스|r" or "",
+            elemTag(def.elem), def.melee and "근접" or "원거리"))
+        for k, sk in ipairs(def.skills) do
+            if k <= count then
+                add("  " .. sk.name .. ":  " .. sk.desc)
+            else
+                add("  |cff6b6e75" .. sk.name .. " (" .. Tables.DIFFICULTY_NAMES[k - 1] .. " 난이도부터)|r")
+            end
+        end
+    end
+    return table.concat(lines, "\n")
+end
+
 local function refresh(f)
     local s = App.state
     if not s then return end
@@ -175,6 +226,35 @@ local function refresh(f)
         b.right:SetText((here and "진행 중 · " or "") .. (open and ("Lv " .. stage.level) or "잠김"))
         b.right:SetTextColor(UI.rgb(here and C.good or (open and (cleared > 0 and C.sub or C.text) or C.dim)))
         b.label:SetTextColor(UI.rgb(open and C.text or C.dim))
+    end
+
+    for act, rb in pairs(f.raidRows) do
+        local key = Raids.key(f.difficulty, act)
+        local open = Game.stageUnlocked(s, key)
+        local running = s.stage.raidKey == key
+        rb:setSelected(f.raidAct == act)
+        rb.right:SetText((running and "진행 중 · " or "") .. (open and ("Lv " .. Tables.STAGES[key].level) or "잠김"))
+        rb.right:SetTextColor(UI.rgb(running and C.good or (open and C.warn or C.dim)))
+        rb.label:SetTextColor(UI.rgb(open and C.text or C.dim))
+    end
+    if f.raidAct then
+        for _, b in pairs(f.rows) do b:setSelected(false) end
+        local raid = Raids.byAct[f.raidAct]
+        local key = Raids.key(f.difficulty, f.raidAct)
+        local stage = Tables.STAGES[key]
+        local tokens = Game.raidTokens(s, f.difficulty)
+        f.name:SetText(raid.name)
+        f.meta:SetText(string.format("%s 레이드  ·  %s  ·  스테이지 레벨 %d  ·  보스 %d명  ·  %s %d개", Tables.DIFFICULTY_NAMES[f.difficulty],
+            raid.zone, stage.level, #raid.bosses, Raids.TOKEN_NAME, tokens))
+        local running = s.stage.raidKey == key
+        local can, why = Game.canStartRaid(s, f.difficulty, f.raidAct)
+        f.go:setEnabled(can and not running)
+        f.go:setText(running and "진행 중" or ("레이드 시작 (" .. Raids.TOKEN_NAME .. " 1개)"))
+        local cleared = s.stage.cleared[key] or 0
+        f.state:SetText(can and ("클리어 " .. cleared .. "회") or (why .. (cleared > 0 and ("  ·  클리어 " .. cleared .. "회") or "")))
+        f.body:SetText(raidText(s, f.difficulty, f.raidAct))
+        f.info:setHeight((f.body:GetStringHeight() or 400) + 10)
+        return
     end
 
     local sec = Dungeons.sections[f.section]

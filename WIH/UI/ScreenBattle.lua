@@ -468,6 +468,16 @@ end
 -- 화면
 ------------------------------------------------------------------------
 
+-- 스테이지 키 → 이름(던전 또는 레이드)
+local function stageName(key)
+    local n = key % 1000
+    if n % 100 == 10 then
+        local raid = WIH.Raids.byAct[math.floor(n / 100)]
+        return raid and (raid.name .. " 레이드") or ""
+    end
+    return Dungeons.sections[n] and Dungeons.sections[n].name or ""
+end
+
 local function create(parent)
     local f = CreateFrame("Frame", nil, parent)
     f.scene = createScene(f)
@@ -530,11 +540,15 @@ local function create(parent)
             line = "보스 등장: " .. a.name
             banner(f.scene, a.name, C.warn)
         elseif ev == "clear" then
-            line = "|cff70b880클리어|r  " .. (Dungeons.sections[a % 1000] and Dungeons.sections[a % 1000].name or "")
+            line = "|cff70b880클리어|r  " .. stageName(a)
             banner(f.scene, "클리어", C.good)
         elseif ev == "fail" then
-            line = "|cffd06058전멸|r  " .. (Dungeons.sections[a % 1000] and Dungeons.sections[a % 1000].name or "")
+            line = "|cffd06058전멸|r  " .. stageName(a)
             banner(f.scene, "전멸", C.bad)
+        elseif ev == "token" then
+            line = "|cffd9b05e" .. WIH.Raids.TOKEN_NAME .. "|r 1개를 얻었습니다. 스테이지 화면에서 레이드에 도전할 수 있습니다."
+        elseif ev == "raidClear" then
+            line = "|cffd9b05e레이드 클리어|r  레이드 상자를 " .. (b == "opened" and ("바로 열었습니다: " .. UI.lootText(c)) or "받았습니다.")
         elseif ev == "levelUp" then
             line = Heroes.byId[a].name .. " 레벨 " .. b
         elseif ev == "firstClear" then
@@ -546,7 +560,8 @@ local function create(parent)
         elseif ev == "loot" then
             line = WIH.Chests.NAMES[a] .. " 자동 개봉: " .. UI.lootText(b)
         elseif ev == "raidUnlocked" then
-            line = "이 액트의 던전을 모두 돌파했습니다. 레이드는 아직 구현되지 않아 현재 스테이지를 반복합니다."
+            local act = math.floor(a % 1000 / 100)
+            line = "이 액트의 던전을 모두 돌파했습니다. 다음으로 가려면 스테이지 화면에서 |cffd9b05e" .. WIH.Raids.byAct[act].name .. "|r 레이드를 클리어해야 합니다."
         end
         if line then
             f.lines[#f.lines + 1] = line
@@ -576,12 +591,12 @@ local function update(f, elapsed)
     if not runner then return end
     if runner.phase == "boss" and runner.boss then
         local boss = runner.boss
-        f.wave:SetText("보스")
+        f.wave:SetText(runner.raid and ("보스 " .. runner.wave .. " / " .. runner.waves) or "보스")
         f.bossBar:Show()
         f.bossBar:set(boss.alive and boss.hp / boss:get("MaxHp") or 0)
         f.bossName:SetText(boss.name)
     else
-        f.wave:SetText("웨이브 " .. runner.wave .. " / " .. runner.waves)
+        f.wave:SetText(runner.raid and ("보스 " .. runner.wave .. " / " .. runner.waves) or ("웨이브 " .. runner.wave .. " / " .. runner.waves))
         f.bossBar:Hide()
         f.bossName:SetText("")
     end

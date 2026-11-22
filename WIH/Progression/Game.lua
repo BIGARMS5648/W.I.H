@@ -297,7 +297,31 @@ function Game.selectStage(state, difficulty, section)
     if not s or s.actBoss or not Dungeons.sections[section] then return fail("선택할 수 없는 스테이지입니다.") end
     if not Game.stageUnlocked(state, key) then return fail("아직 열리지 않은 스테이지입니다.") end
     state.stage.difficulty, state.stage.section = difficulty, section
+    state.stage.raidKey = nil        -- 던전을 고르면 예약했거나 진행 중인 레이드는 그만둔다
     return true
+end
+
+-- 레이드(액트 보스 자리). 입장에는 그 난이도의 증표 1개가 필요하고, 클리어했을 때만 소모된다. [원작 구조 / 추정: 소모 시점]
+function Game.raidTokens(state, difficulty)
+    local id = WIH.Raids.TOKEN[difficulty]
+    return id and state.materials and state.materials[id] or 0
+end
+
+function Game.canStartRaid(state, difficulty, act)
+    local key = WIH.Raids.key(difficulty, act)
+    local stage = Tables.STAGES[key]
+    if not stage or not stage.actBoss or not WIH.Raids.byAct[act] then return fail("없는 레이드입니다.") end
+    if not Game.stageUnlocked(state, key) then return fail("이 액트의 던전을 모두 클리어해야 열립니다.") end
+    if Game.raidTokens(state, difficulty) < 1 then return fail(WIH.Raids.TOKEN_NAME .. "가 없습니다.") end
+    return true, key
+end
+
+-- 레이드를 예약한다. 다음에 시작하는 스테이지가 레이드가 된다(화면은 바로 다시 시작시킨다).
+function Game.startRaid(state, difficulty, act)
+    local ok, key = Game.canStartRaid(state, difficulty, act)
+    if not ok then return false, key end
+    state.stage.raidKey = key
+    return true, key
 end
 
 function Game.markCleared(state, key)

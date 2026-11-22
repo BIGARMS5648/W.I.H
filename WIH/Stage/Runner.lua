@@ -14,6 +14,7 @@ local Skills = WIH.module("Skills")
 local Level = WIH.module("Level")
 local Monsters = WIH.module("Monsters")
 local Dungeons = WIH.module("Dungeons")
+local Raids = WIH.module("Raids")
 local HeroBuild = WIH.module("HeroBuild")
 local Runner = WIH.module("Runner")
 
@@ -29,17 +30,24 @@ local TRAVEL_PAUSE = 0.6    -- [독자] 웨이브를 정리한 뒤 다음 웨이
 --   difficulty(1~4), section(구간 키), seed
 --   party = { {heroId, form, passivePoints, skills = {{id, level}, ...}, gear, level, exp}, ... } (편성 순서)
 --   account(계정 공통 시트), bossIndex(이번에 나올 보스의 순번), tuning = {hp, atk}(5인 보정 계수), onEvent
+--   raidKey(레이드 스테이지의 키): 주면 그 레이드를 진행한다. 보스를 차례로 상대하며 wave가 보스 순번이 된다.
 function Runner.new(opts)
-    local key = Dungeons.stageKey(opts.difficulty or 1, opts.section)
+    local key = opts.raidKey or Dungeons.stageKey(opts.difficulty or 1, opts.section)
     local stage = Tables.STAGES[key]
-    local section = Dungeons.sections[opts.section]
-    if not stage or not section then error("알 수 없는 스테이지: " .. tostring(key)) end
-    if stage.actBoss then error("레이드 스테이지는 이 진행기가 다루지 않는다: " .. tostring(key)) end
+    local raid, section
+    if stage and stage.actBoss then
+        raid = Raids.byAct[math.floor(key % 1000 / 100)]
+        if not raid then error("레이드 데이터가 없음: " .. tostring(key)) end
+    else
+        section = Dungeons.sections[opts.section]
+        if not stage or not section then error("알 수 없는 스테이지: " .. tostring(key)) end
+    end
+    local difficulty = raid and math.floor(key / 1000) or (opts.difficulty or 1)
     local r = setmetatable({
-        key = key, stage = stage, section = section, difficulty = opts.difficulty or 1,
+        key = key, stage = stage, section = section, raid = raid, difficulty = difficulty,
         party = opts.party, account = opts.account, tuning = opts.tuning or { hp = 1, atk = 1 },
         bossIndex = opts.bossIndex or 1,
-        wave = 0, waves = stage.waves - (opts.waveReduction or 0), phase = "start", timer = 0,
+        wave = 0, waves = raid and #raid.bosses or (stage.waves - (opts.waveReduction or 0)), phase = "start", timer = 0,
         result = nil, listeners = {},
         totals = { gold = 0, exp = {}, kills = 0, bossKills = 0, chestRolls = 0, bossChestRolls = 0 },
     }, R)
@@ -109,7 +117,8 @@ function Runner.bossValues(stage, section, def)
 end
 
 -- values = { hp, atk, gold, exp }(이미 스테이지에 맞춰진 실제 수치), tuning = { hp, atk }(5인 보정 계수)
-function Runner.spawnMonster(battle, def, values, x, tuning)
+-- maxSkills가 있으면 패턴을 앞에서부터 그 수만큼만 쓴다(레이드 보스의 난이도별 패턴 수).
+function Runner.spawnMonster(battle, def, values, x, tuning, maxSkills)
     tuning = tuning or { hp = 1, atk = 1 }
     local hp, atk = values.hp * tuning.hp, values.atk * tuning.atk
     local gold, exp = values.gold, values.exp
@@ -124,7 +133,7 @@ function Runner.spawnMonster(battle, def, values, x, tuning)
     u.reward = { gold = gold, exp = exp }
     battle:addUnit(u)
     if def.skills then
-        for i = 1, #def.skills do
+        for i = 1, math.min(#def.skills, maxSkills or #def.skills) do
             local slot = Skills.equip(battle, u, def.skills[i], 1)
             -- 보스의 재사용 스킬은 등장 직후 한꺼번에 쏟아지지 않도록 절반만 충전된 채 시작한다. [독자]
             if slot.cd then slot.charge = slot.cd * 0.5 end
@@ -165,6 +174,23 @@ function R:spawnBoss()
     self:emit("boss", self.boss)
 end
 
+-- 레이드의 다음 보스. 마지막 보스는 원작 액트 보스의 체력, 그 앞의 보스들은 그 일부다.
+-- 공격력은 초당 피해가 원작 액트 보스와 같아지게 맞춘다. 골드·경험치는 원작의 총량을 체력 비율대로 나눈다. [원작 총량 / 독자 배분]
+function R:spawnRaidBoss()
+    self.wave = self.wave + 1
+    local def = Monsters.defs[self.raid.bosses[self.wave]]
+    local final = self.stage.actBossFinal
+    local share = (self.wave == self.waves) and 1 or Raids.EARLY_HP
+    local totalShare = 1 + (self.waves - 1) * Raids.EARLY_HP
+    local values = {
+        hp = final.hp * share, atk = final.atk * final.as / def.as,
+        gold = final.gold * share / totalShare, exp = final.exp * share / totalShare,
+    }
+    self.boss = Runner.spawnMonster(self.battle, def, values, self:frontX() + BOSS_GAP, self.tuning, Raids.skillCount(self.difficulty))
+    self.phase = "boss"
+    self:emit("boss", self.boss, self.wave, self.waves)
+end
+
 -- 전투 이벤트: 몬스터가 죽으면 보상을 계산한다.
 function R:onBattleEvent(ev, a, b, c, d, e, f)
     if ev == "death" and a.team == 2 and a.reward then
@@ -184,7 +210,9 @@ function R:onBattleEvent(ev, a, b, c, d, e, f)
         end
         if a.isBoss then
             totals.bossKills = totals.bossKills + 1
-            if self.battle.rng:chance(self.stage.bossChest / 1000) then totals.bossChestRolls = totals.bossChestRolls + 1 end
+            if self.stage.bossChest and self.battle.rng:chance(self.stage.bossChest / 1000) then totals.bossChestRolls = totals.bossChestRolls + 1 end
+        elseif self.raid then
+            -- 레이드에서는 일반 상자가 없다.
         else
             if self.battle.rng:chance(self.stage.chest / 1000) then totals.chestRolls = totals.chestRolls + 1 end
         end
@@ -199,7 +227,7 @@ function R:step()
     if self.result then return self.result end
     local b = self.battle
     if self.phase == "start" then
-        self:spawnWave()
+        if self.raid then self:spawnRaidBoss() else self:spawnWave() end
     end
     b:step()
 
@@ -221,11 +249,17 @@ function R:step()
         elseif self.phase == "travel" then
             self.timer = self.timer - WIH.TICK
             if self.timer <= 0 then
-                if self.wave < self.waves then self:spawnWave() else self:spawnBoss() end
+                if self.raid then self:spawnRaidBoss()
+                elseif self.wave < self.waves then self:spawnWave() else self:spawnBoss() end
             end
         elseif self.phase == "boss" then
-            self.result = "clear"
-            self:emit("clear", self.totals)
+            if self.raid and self.wave < self.waves then
+                self.phase = "travel"            -- 다음 보스로 이동
+                self.timer = TRAVEL_PAUSE
+            else
+                self.result = "clear"
+                self:emit("clear", self.totals)
+            end
         end
     end
     return self.result

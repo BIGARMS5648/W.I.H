@@ -43,7 +43,9 @@ local function updateTop()
     local sec = Dungeons.sections[state.stage.section]
     local text = Tables.DIFFICULTY_NAMES[state.stage.difficulty] .. "  ·  " .. (sec and sec.name or "")
     local runner = App.session and App.session.runner
-    if runner then
+    if runner and runner.raid then
+        text = Tables.DIFFICULTY_NAMES[runner.difficulty] .. "  ·  " .. runner.raid.name .. " 레이드  ·  보스 " .. runner.wave .. "/" .. runner.waves
+    elseif runner then
         if runner.phase == "boss" and runner.boss then
             text = text .. "  ·  보스"
         else

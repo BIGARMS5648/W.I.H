@@ -65,7 +65,7 @@ local function create(parent)
     -- 왼쪽: 보유 영웅
     f.heroList = UI.scroll(f)
     f.heroList:SetPoint("TOPLEFT", 10, -10)
-    f.heroList:SetPoint("BOTTOMLEFT", 10, 76)
+    f.heroList:SetPoint("BOTTOMLEFT", 10, 96)
     f.heroList:SetWidth(132)
     f.heroRows = {}
 
@@ -153,7 +153,7 @@ local function create(parent)
     -- 고른 아이템의 상세
     local d = UI.panel(f, C.panel, true)
     d:SetPoint("TOPLEFT", 456, -46 - (4 * (CELL + 4) + 2) - 8)
-    d:SetPoint("BOTTOMRIGHT", -10, 76)
+    d:SetPoint("BOTTOMRIGHT", -10, 96)
     f.detail = d
     f.dIcon = UI.icon(d, 34)
     f.dIcon:SetPoint("TOPLEFT", 10, -10)
@@ -192,12 +192,12 @@ local function create(parent)
     local chest = UI.panel(f, C.panel, true)
     chest:SetPoint("BOTTOMLEFT", 10, 10)
     chest:SetPoint("BOTTOMRIGHT", -10, 10)
-    chest:SetHeight(58)
+    chest:SetHeight(78)
     f.chestRows = {}
     for i, kind in ipairs(Chests.KINDS) do
         local row = CreateFrame("Frame", nil, chest)
-        row:SetSize(330, 24)
-        row:SetPoint("TOPLEFT", 10 + (i - 1) * 340, -6)
+        row:SetSize(264, 24)
+        row:SetPoint("TOPLEFT", 10 + (i - 1) * 272, -6)
         row.text = UI.text(row, 12, C.text)
         row.text:SetPoint("LEFT", 0, 0)
         row.open = UI.button(row, "열기", 48, 22, function()
@@ -209,7 +209,7 @@ local function create(parent)
             end
             UI.screens.bag.refresh(f)
         end)
-        row.open:SetPoint("LEFT", 176, 0)
+        row.open:SetPoint("LEFT", 132, 0)
         row.all = UI.button(row, "모두 열기", 70, 22, function()
             local s = App.state
             if not Chests.canOpenAll(s) then return WIH.Main.notice("모두 열기는 룬으로 해금합니다.", C.bad) end
@@ -228,14 +228,14 @@ local function create(parent)
         row.timer:SetPoint("TOPLEFT", 0, -26)
         f.chestRows[kind] = row
     end
-    f.extra = UI.text(chest, 11, C.sub, "RIGHT")
-    f.extra:SetPoint("TOPRIGHT", -10, -10)
+    f.extra = UI.text(chest, 11, C.sub)
+    f.extra:SetPoint("BOTTOMLEFT", 10, 8)
     f.claim = UI.button(chest, "임시 보관함에서 꺼내기", 150, 22, function()
         local n = Inventory.claimMail(App.state)
         WIH.Main.notice(n > 0 and (n .. "개를 가방으로 옮겼습니다.") or "가방에 빈칸이 없습니다.", n > 0 and C.good or C.bad)
         UI.screens.bag.refresh(f)
     end)
-    f.claim:SetPoint("BOTTOMRIGHT", -10, 6)
+    f.claim:SetPoint("BOTTOMRIGHT", -10, 4)
     f.acc = 0
     return f
 end
@@ -300,6 +300,7 @@ local function cell(f, n)
 end
 
 local function timerText(s, kind)
+    if kind == "raid" then return "레이드를 클리어하면 받습니다" end
     local c = s.chests[kind]
     if c.allowance >= 1 then return "상자를 받을 수 있습니다" end
     local info = ChestTable.STAGE[Game.currentStageKey(s)]
@@ -324,7 +325,13 @@ local function paintChests(f)
     end
     local mats = 0
     for _, count in pairs(s.materials) do mats = mats + count end
-    f.extra:SetText(string.format("임시 보관함 %d개  ·  재료 %d개(큐브가 들어오면 쓰입니다)", #s.mail, mats))
+    local tokens = {}
+    for d = 1, 4 do
+        local n = Game.raidTokens(s, d)
+        if n > 0 then tokens[#tokens + 1] = WIH.Tables.DIFFICULTY_NAMES[d] .. " " .. n end
+    end
+    f.extra:SetText(string.format("임시 보관함 %d개  ·  재료 %d개(큐브가 들어오면 쓰입니다)  ·  %s %s", #s.mail, mats, WIH.Raids.TOKEN_NAME,
+        #tokens > 0 and table.concat(tokens, ", ") or "없음"))
     f.claim:SetShown(#s.mail > 0)
 end
 

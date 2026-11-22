@@ -33,7 +33,7 @@ local function startSession()
     App.session = Session.new(App.state, { seed = seed })
     App.session:addListener(function(ev, a, b, c)
         if ev == "levelUp" or ev == "clear" or ev == "fail" or ev == "stageStart" or ev == "raidUnlocked"
-            or ev == "chest" or ev == "loot" or ev == "firstClear" then
+            or ev == "chest" or ev == "loot" or ev == "firstClear" or ev == "raidClear" or ev == "token" then
             App.notify(ev)
         end
     end)

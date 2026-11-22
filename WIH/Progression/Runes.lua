@@ -80,8 +80,6 @@ Runes.STATS = {
 -- 아직 이 효과를 쓰는 시스템이 들어오지 않은 스탯. 살 수는 있지만(뒤의 룬을 여는 조건이므로) 지금은 효과가 없다.
 -- 해당 시스템을 구현할 때 여기서 지운다. 화면은 이 표를 보고 "미적용"을 표시한다.
 Runes.INACTIVE = {
-    AdditionalGoldActBoss = "레이드", AdditionalExpActBoss = "레이드",
-    MaxAmountActBossChest = "레이드", UnlockAutoOpenActBossChest = "레이드", ReduceAutoOpenActBossChestTime = "레이드",
     CubeExpPercent = "큐브",
     OfflineRewardGoldPercent = "오프라인 보상", OfflineRewardExpPercent = "오프라인 보상", UnlockOfflineReward = "오프라인 보상",
     UnlockStashPageCount = "보관함",

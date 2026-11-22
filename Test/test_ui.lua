@@ -265,6 +265,45 @@ T.case("가방 화면: 첫 클리어 보상, 장착·해제, 잠금, 팔기, 칸
     noErrors("가방 화면")
 end)
 
+T.case("레이드: 스테이지 화면에서 시작하고, 전투 화면과 위쪽 표시가 레이드를 보여 준다", function()
+    local s = App.state
+    local Raids = WIH.Raids
+    for n = 1, 9 do s.stage.cleared[1100 + n] = 1 end
+    s.stage.cleared[1110] = nil
+    Game.selectStage(s, 1, 109)
+    s.materials[Raids.TOKEN[1]] = 0
+    local f = open("stage")
+    f.difficulty = 1
+    f.raidRows[1]:Click("LeftButton")
+    T.eq(f.raidAct, 1)
+    T.ok(f.name:GetText():find("오닉시아"), "레이드 이름이 보임")
+    T.ok(not f.go.enabled, "증표가 없으면 시작할 수 없음")
+    T.ok(f.state:GetText():find("증표"), "못 가는 사유가 보임: " .. f.state:GetText())
+    T.ok(f.body:GetText():find("마지막 보스") and f.body:GetText():find("난이도부터"), "보스와 패턴 정보가 채워짐")
+    s.materials[Raids.TOKEN[1]] = 1
+    UI.screens.stage.refresh(f)
+    T.ok(f.go.enabled)
+    f.go:Click("LeftButton")
+    T.eq(s.stage.raidKey, 1110)
+    T.ok(App.session.runner.raid ~= nil, "레이드가 바로 시작됨")
+    T.ok(not f.go.enabled, "진행 중에는 다시 시작할 수 없음")
+    local battle = open("battle")
+    Stub.advance(3, 0.05)
+    T.ok(battle.wave:GetText():find("보스 1 / 1"), "전투 화면에 보스 순번이 보임: " .. battle.wave:GetText())
+    -- 던전을 고르면 레이드를 그만둔다
+    f = open("stage")
+    f.rows[103]:Click("LeftButton")
+    T.eq(f.raidAct, nil)
+    f.go:Click("LeftButton")
+    T.eq(s.stage.raidKey, nil)
+    T.ok(App.session.runner.raid == nil)
+    T.eq(Game.raidTokens(s, 1), 1, "그만두면 증표는 그대로")
+    -- 가방 화면에 레이드 상자 줄이 있다
+    local bag = open("bag")
+    T.ok(bag.chestRows.raid and bag.chestRows.raid.text:GetText():find("레이드 상자"))
+    noErrors("레이드 화면")
+end)
+
 T.case("모든 화면의 보이는 버튼을 눌러도 오류가 없다", function()
     local s = App.state
     s.gold = 5e8

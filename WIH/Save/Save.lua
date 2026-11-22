@@ -196,6 +196,10 @@ function Save.validate(state)
     for key, v in pairs(st.bossIndex) do
         if not Tables.STAGES[key] or not isInt(v) or v < 1 then st.bossIndex[key] = nil end
     end
+    if st.raidKey ~= nil then
+        local rs = Tables.STAGES[st.raidKey]
+        if not rs or not rs.actBoss or not Game.stageUnlocked(state, st.raidKey) then st.raidKey = nil end
+    end
     st.difficulty = clampInt(st.difficulty, 1, 4, 1)
     if not Dungeons.sections[st.section] then st.section = 101 end
     if not Game.stageUnlocked(state, Dungeons.stageKey(st.difficulty, st.section)) then
