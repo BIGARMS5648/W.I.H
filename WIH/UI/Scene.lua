@@ -394,6 +394,8 @@ function Scene.update(scene, elapsed)
             else
                 t.hp:Hide()
                 t.deadFor = (t.deadFor or 0) + elapsed
+                -- 쓰러지는 동작이 되풀이되지 않게, 끝난 뒤에는 쓰러져 있는 자세로 둔다.
+                if t.useModel and t.deadFor > 1.0 then t.view:setAnim(UI.ANIM.dead) end
                 -- 쓰러지는 동작이 끝난 뒤 서서히 옅어진다. 영웅은 부활을 기다리므로 남겨 둔다.
                 local fade = u.kind == "hero" and 0.4 or math.max(0, 1 - math.max(0, t.deadFor - 0.8) * 1.5)
                 t:SetAlpha(t.useModel and math.max(fade, u.kind == "hero" and 0.4 or 0) or 0.28)

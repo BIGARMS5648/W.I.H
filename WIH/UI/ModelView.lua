@@ -8,7 +8,7 @@ local UI = WIH.module("UI")
 local Models = WIH.module("Models")
 
 -- 동작 번호(클라이언트의 애니메이션 번호)
-UI.ANIM = { stand = 0, death = 1, walk = 4, run = 5, wound = 8, attack = 17, attackUnarmed = 16, cast = 51, castOmni = 52 }
+UI.ANIM = { stand = 0, death = 1, walk = 4, run = 5, dead = 6, wound = 8, attack = 17, attackUnarmed = 16, cast = 51, castOmni = 52 }
 
 Models.known = {}        -- [생물 번호] = true(불러와짐) | false(실패). 한 번 알아내면 다시 시험하지 않는다
 local CHECK_TIME = 2.0   -- 이 시간 안에 모델 파일이 잡히지 않으면 실패로 본다(처음 불러올 때는 시간이 걸릴 수 있다)
