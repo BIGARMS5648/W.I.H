@@ -86,6 +86,9 @@ function methods:SetCustomRace(race, sex) self.__creature = 900000 + race * 10 +
 function methods:Undress() self.__worn = {} end
 function methods:TryOn(link, hand) self.__worn = self.__worn or {}; self.__worn[#self.__worn + 1] = link .. (hand and ("@" .. hand) or "") end
 function methods:SetSheathed(v) self.__sheathed = v end
+-- 동작: 마지막으로 건 동작 번호를 기억한다. Stub.animations가 있으면 그 표에 있는 번호만 가진 것으로 친다.
+function methods:SetAnimation(id) self.__anim = id; self.__animSets = (self.__animSets or 0) + 1 end
+function methods:HasAnimation(id) return Stub.animations == nil or Stub.animations[id] == true end
 function methods:ClearModel() self.__creature = nil end
 function methods:GetModelFileID()
     if not Stub.modelsWork or not self.__creature then return nil end

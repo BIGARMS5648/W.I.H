@@ -121,7 +121,7 @@ local function style(scene, t, u, wantModel)
     t:SetSize(size[1], size[2])
     t.token:SetSize(size[3], size[3])
     t.hp:SetWidth(math.min(size[1] - 12, 60))
-    t.anim, t.animUntil, t.deadFor, t.lastX = nil, nil, nil, nil
+    t.anim, t.animUntil, t.deadFor, t.lastX, t.moveLeft, t.runAnim = nil, nil, nil, nil, nil, nil
     t:SetAlpha(1)
     -- 아이콘 표시의 내용
     if u.kind == "hero" and u.heroId then
@@ -248,10 +248,25 @@ local function spawnShot(scene, x0, y0, x1, y1, color)
     end
 end
 
-local function playAnim(t, id, seconds)
+-- 유닛의 공격 동작 후보: 무기와 공격 방식에 따라 고른다.
+local function attackChoices(u)
+    local A = UI.ANIM_CHOICES
+    if u.kind == "hero" and u.def then
+        local main = u.def.main
+        if main == "BOW" or main == "CROSSBOW" then return A.bow end
+        if main == "GUN" then return A.gun end
+        if main == "STAFF" or main == "WAND" then return u.melee and A.melee2h or A.spell end
+        if main == "GREATSWORD" then return A.melee2h end
+        return u.melee and A.melee1h or A.spell
+    end
+    return u.melee and A.melee1h or A.spell
+end
+
+-- 한 번 재생하는 동작(공격, 시전). seconds 동안은 달리기·서 있기로 덮어쓰지 않는다.
+local function playAnim(t, choices, seconds)
     if not t or not t.useModel then return end
-    t.view:setAnim(id)
-    t.anim, t.animUntil = id, seconds
+    t.view:replay(t.view:pickAnim(choices))
+    t.animUntil = seconds
 end
 
 -- 전투 이벤트 → 시각 표현
@@ -281,25 +296,25 @@ function Scene.onBattleEvent(scene, ev, a, b, c, d, e)
                 scene.lunge[src.id] = 0.14
             end
         end
-        playAnim(src and scene.views[src.id], UI.ANIM.attack, 0.55)
+        if src then playAnim(scene.views[src.id], attackChoices(src), 0.6) end
     elseif ev == "cast" then
         local t = a and scene.views[a.id]
         if t and b then
             t.cast:SetText(b.name or "")
             t.castT = 1.0
-            playAnim(t, UI.ANIM.cast, 0.8)
+            playAnim(t, UI.ANIM_CHOICES.cast, 0.9)
         end
     elseif ev == "death" then
         local t = a and scene.views[a.id]
         if t then
             t.deadFor = 0
-            if t.useModel then t.view:setAnim(UI.ANIM.death) end
+            if t.useModel then t.view:replay(t.view:pickAnim(UI.ANIM_CHOICES.death)); t.animUntil = nil end
         end
     elseif ev == "revive" then
         local p = a and pos[a.id]
         if p then spawnFloat(scene, p.x, p.top + 12, "부활", C.good, true) end
         local t = a and scene.views[a.id]
-        if t then t.deadFor = nil; if t.useModel then t.view:setAnim(UI.ANIM.stand) end; t:SetAlpha(1) end
+        if t then t.deadFor = nil; if t.useModel then t.view:replay(UI.ANIM.stand) end; t:SetAlpha(1) end
     elseif ev == "cheatDeath" then
         local p = a and pos[a.id]
         if p then spawnFloat(scene, p.x, p.top + 12, "버팀", C.warn, true) end
@@ -459,16 +474,27 @@ function Scene.update(scene, elapsed)
                         t.animUntil = t.animUntil - elapsed
                         if t.animUntil <= 0 then t.animUntil = nil end
                     end
+                    -- 이동 판정: 전투 계산은 초당 20번인데 화면은 그보다 자주 그려진다. 좌표가 바뀐 프레임만 보면
+                    -- 달리기와 서 있기가 번갈아 걸리므로, 마지막으로 움직인 뒤 0.25초 동안은 달리는 것으로 본다.
+                    if t.lastX ~= nil and math.abs(u.x - t.lastX) > 0.01 then t.moveLeft = 0.25
+                    elseif t.moveLeft then
+                        t.moveLeft = t.moveLeft - elapsed
+                        if t.moveLeft <= 0 then t.moveLeft = nil end
+                    end
                     if not t.animUntil then
-                        local run = t.lastX ~= nil and math.abs(u.x - t.lastX) > 0.01
-                        t.view:setAnim(run and UI.ANIM.run or UI.ANIM.stand)
+                        if t.moveLeft then
+                            if not t.runAnim then t.runAnim = t.view:pickAnim(UI.ANIM_CHOICES.run) end
+                            t.view:setAnim(t.runAnim)
+                        else
+                            t.view:setAnim(UI.ANIM.stand)
+                        end
                     end
                 end
             else
                 t.hp:Hide()
                 t.deadFor = (t.deadFor or 0) + elapsed
                 -- 쓰러지는 동작이 되풀이되지 않게, 끝난 뒤에는 쓰러져 있는 자세로 둔다.
-                if t.useModel and t.deadFor > 1.0 then t.view:setAnim(UI.ANIM.dead) end
+                if t.useModel and t.deadFor > 1.2 then t.view:setAnim(t.view:pickAnim(UI.ANIM_CHOICES.dead)) end
                 -- 쓰러지는 동작이 끝난 뒤 서서히 옅어진다. 영웅은 부활을 기다리므로 남겨 둔다.
                 local fade = u.kind == "hero" and 0.4 or math.max(0, 1 - math.max(0, t.deadFor - 0.8) * 1.5)
                 t:SetAlpha(t.useModel and math.max(fade, u.kind == "hero" and 0.4 or 0) or 0.28)

@@ -201,6 +201,45 @@ T.case("장비 룩: 낀 장비대로 옷과 무기를 입힌 캐릭터로 표시
     noErrors("장비 룩")
 end)
 
+T.case("동작: 이동하는 동안 달리기 동작이 끊기지 않고, 공격할 때 공격 동작으로 바뀐다", function()
+    -- 화면은 초당 60번, 전투 계산은 초당 20번이다. 좌표가 안 바뀐 프레임에 서 있기로 돌아가면 안 된다.
+    Stub.modelsWork = true
+    Models.resetKnown()
+    App.restartStage()
+    Stub.advance(0.5, 1 / 60)
+    local hero = heroView()
+    T.ok(hero and hero.useModel, "영웅이 모델로 표시됨")
+    local model = hero.view.model
+    local runFrames, standFrames, flips, last, sawAttack = 0, 0, 0, nil, false
+    local unit = hero.unit
+    for _ = 1, 600 do
+        local x0 = unit.x
+        Stub.advance(1 / 60, 1 / 60)
+        hero = heroView()
+        if hero and hero.unit == unit and hero.useModel then
+            local anim = model.__anim
+            if anim == 17 or anim == 16 or anim == 18 then sawAttack = true end
+            if hero.moveLeft and not hero.animUntil then
+                if anim == 5 then runFrames = runFrames + 1 elseif anim == 0 then standFrames = standFrames + 1 end
+                if last and last ~= anim and (anim == 5 or anim == 0) and (last == 5 or last == 0) then flips = flips + 1 end
+                last = anim
+            else
+                last = nil
+            end
+        end
+    end
+    T.ok(runFrames > 30, "달리는 프레임 수: " .. runFrames)
+    T.eq(standFrames, 0, "이동 중에 서 있기 동작으로 돌아가는 프레임이 없어야 함")
+    T.eq(flips, 0, "달리기와 서 있기가 번갈아 걸리지 않아야 함")
+    T.ok(sawAttack, "공격할 때 공격 동작이 걸림")
+    -- 그 모델에 없는 동작이면 다음 후보를 쓴다
+    Stub.animations = { [0] = true, [4] = true, [16] = true }
+    T.eq(hero.view:pickAnim(UI.ANIM_CHOICES.run), 4, "달리기가 없으면 걷기")
+    T.eq(hero.view:pickAnim(UI.ANIM_CHOICES.melee1h), 16, "한손 공격이 없으면 맨손 공격")
+    Stub.animations = nil
+    noErrors("동작")
+end)
+
 T.case("3D 모델: 옷을 입힐 수 없는 클라이언트에서는 고정 모델로, 실패한 번호는 다음 후보로 넘어간다", function()
     Stub.noDress = true
     Models.resetKnown()
@@ -620,7 +659,7 @@ local KNOWN = {
     SetDesaturated = true, SetAtlas = true, SetVertexColor = true, UpdateScrollChildRect = true, SetSpacing = true,
     SetOwner = true, ClearLines = true, AddLine = true,
     -- PlayerModel(환경 점검에서 있는 것을 확인)
-    SetFacing = true, SetCamDistanceScale = true, SetAnimation = true, SetKeepModelOnHide = true, GetBottom = true,
+    SetFacing = true, SetCamDistanceScale = true, SetKeepModelOnHide = true, GetBottom = true,
 }
 T.case("화면이 부른 위젯 메서드는 모두 아는 이름이다", function()
     local unknown = {}

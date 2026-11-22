@@ -13,6 +13,18 @@ local Models = WIH.module("Models")
 
 -- 동작 번호(클라이언트의 애니메이션 번호)
 UI.ANIM = { stand = 0, death = 1, walk = 4, run = 5, dead = 6, wound = 8, attack = 17, attackUnarmed = 16, cast = 51, castOmni = 52 }
+-- 동작의 후보(앞에서부터 그 모델이 가진 것을 쓴다). 생물마다 가진 동작이 달라서 여러 개를 둔다.
+UI.ANIM_CHOICES = {
+    run = { 5, 4 },                         -- 달리기, 걷기
+    melee1h = { 17, 16, 18 },               -- 한손 공격, 맨손 공격, 양손 공격
+    melee2h = { 18, 17, 16 },
+    bow = { 46, 109, 49, 17, 16 },          -- 활, 석궁, 총
+    gun = { 49, 46, 17, 16 },
+    spell = { 51, 52, 53, 17, 16 },         -- 대상 지정 시전, 주변 시전
+    cast = { 52, 51, 53, 17, 16 },
+    death = { 1 },
+    dead = { 6, 1 },
+}
 
 Models.known = {}        -- [생물 번호] = true(불러와짐) | false(실패). 접속해 있는 동안 기억한다
 Models.dress = nil       -- 캐릭터에 장비를 입히는 방식이 되는지: nil(아직 모름) | true | false
@@ -139,6 +151,24 @@ function UI.modelView(parent)
 
     function v:setAnim(id)
         if self.anim == id then return end
+        self.anim = id
+        if self.model and (self.creature or self.look) and self.model.SetAnimation then pcall(self.model.SetAnimation, self.model, id) end
+    end
+
+    -- 후보 목록에서 이 모델이 가진 첫 동작을 고른다. 가진 동작을 물을 수 없으면 첫 후보를 쓴다.
+    function v:pickAnim(choices)
+        local model = self.model
+        if model and model.HasAnimation and not self.pending then
+            for i = 1, #choices do
+                local ok, has = pcall(model.HasAnimation, model, choices[i])
+                if ok and has then return choices[i] end
+            end
+        end
+        return choices[1]
+    end
+
+    -- 같은 동작이라도 처음부터 다시 재생한다(연속 공격).
+    function v:replay(id)
         self.anim = id
         if self.model and (self.creature or self.look) and self.model.SetAnimation then pcall(self.model.SetAnimation, self.model, id) end
     end
