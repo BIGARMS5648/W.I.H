@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: W.I.H
 ## Notes: 와우 포에버 안에서 즐기는 독립형 방치 RPG
-## Version: 0.6.0
+## Version: 0.7.0
 ## SavedVariables: WIH_DB, WIH_DB_BACKUP, WIH_UI
 ## AddonCompartmentFunc: WIH_OnCompartmentClick
 ## IconTexture: Interface\Icons\INV_Misc_Gear_01
