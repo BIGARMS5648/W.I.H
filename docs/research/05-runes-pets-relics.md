@@ -2,7 +2,7 @@
 
 - 조사일: 2026-11-21 ~ 22. 대상: Steam app 3678970 《TBH: Task Bar Hero》.
 - 목적: 원작의 **규칙과 수치**를 사실로서 기록한다(코드·아트·문장은 옮기지 않음. 효과 설명은 모두 본 문서의 한국어 풀이이며, 원문 툴팁이 아니다).
-- 태그: **[확인]** = 공식 자료 / 게임 데이터 추출 기반 DB / 독립된 2개 이상 출처 일치, **[추정]** = 단일 비공식 출처 또는 추론, **[미확인]** = 찾지 못함.
+- 태그: **[확인]** = 공식 자료 / 게임 데이터 제거 기반 DB / 독립된 2개 이상 출처 일치, **[추정]** = 단일 비공식 출처 또는 추론, **[미확인]** = 찾지 못함.
 - 표기: 비용은 골드(G). `k`=1,000, `M`=1,000,000 (정확한 값만 축약, 반올림 없음).
 
 ## 0. 먼저 읽을 것 — 버전 기준과 데이터 확보 수준
@@ -21,7 +21,7 @@
 | 룬 노드 전체(키·효과·레벨별 수치·레벨별 비용·선행·좌표) | taskbarhero.wiki 내장 JSON(`/data/rune_tree.json`, `/data/runes.json`, `/data/t/rune_levels.json`) 197개 노드 | **v1.00.17 (2026-06-20)** — 사이트가 "Wiki data current as of this patch"라고 명시. 1.02.00 이전 상태 | [확인] 노드 단위 전량 |
 | 룬 스탯별 집계(노드 수, 레벨당 수치 합) | flex.shunshu-labo.org "TBH DBAPP" `tbh-data.json` (253개 노드, 50개 스탯 묶음) | **v1.03.00 (데이터 갱신 2026-10-23)** | [확인] 집계 수준만. 1.02.00 이후 추가된 56개 노드의 **노드별 비용·좌표·선행은 미확보** |
 | 펫 | taskbarhero.wiki `/data/t/pets.json`, `/data/t/pet_stats.json`(8종) + shunshu DBAPP(10종) + 공식 패치노트 | v1.00.17 + v1.03.00 | [확인] |
-| 유물·유물함·공명·조율·봉헌 확률 | shunshu DBAPP `tbh-data.json`(유물 36종×10등급, 유물함 62종, 등급별 풀, 조율 비용, 봉헌 가중치) + 공식 1.3.0/1.3.2 패치노트 | **v1.03.00** | [확인] (tbhindex.com 수치와 검색 요약 수준에서 일치) |
+| 유물·유물함·공명·조율·기원 확률 | shunshu DBAPP `tbh-data.json`(유물 36종×10등급, 유물함 62종, 등급별 풀, 조율 비용, 기원 가중치) + 공식 1.3.0/1.3.2 패치노트 | **v1.03.00** | [확인] (tbhindex.com 수치와 검색 요약 수준에서 일치) |
 | 업적 | Steam 커뮤니티 업적 페이지 + Steam API 달성률(80개) | 2026-11-21 시점 | [확인] |
 | 스탯 합산 공식 | taskbarhero.wiki /mechanics(디컴파일 기반), shunshu /mechanics | v1.00.17 / v1.03.00 | [확인] 두 사이트 일치 |
 
@@ -36,13 +36,13 @@
 - **비용 곡선**: 공식(수식)이 아니라 **노드·레벨마다 값이 박힌 테이블**이다. 한 노드 안에서는 대체로 등차(+10%씩 등), 가지를 따라 다음 노드로 갈수록 대략 ×1.3~×1.5씩 뛴다(예: 탐색/정복 사슬의 115번 이후는 노드마다 첫 레벨 비용이 약 1.5배). 표 1.5 참고. [확인]
 - **선행 조건**: 각 노드는 부모 노드 1개(연결선)에 매달린다. 데이터에는 노드별 `PrevNodeRequiredLevel`(부모에게 요구하는 레벨) 필드가 있고, 197개 중 14개만 값이 있다(1이 11개, 5가 3개). 값이 비어 있는 183개 노드에서 부모를 "1레벨만 찍으면 되는지 / 최대 레벨까지 찍어야 하는지"는 데이터만으로는 확정되지 않는다. [확인: 필드 존재와 값] / [미확인: 빈 값의 기본 규칙]
 - **적용 범위**: **계정(파티) 공통**. 전투 룬의 스탯 ID가 전부 `AllHero…`(전 영웅)이고, 게임 코드상 스탯 출처 분류명이 `AccountStatus`이다. 플레이테스트 0.01.04 패치노트에 "룬 보너스가 새로 추가한 캐릭터에 적용되지 않고 재시작해야 적용되던 문제 수정"이 있어, 모든 영웅에게 적용되는 것이 의도임이 확인된다. 영웅 개별 룬은 없다. [확인] taskbarhero.wiki /mechanics, Steam 공지 "Playtest Update - ver 0.01.04"(2026-04-30)
-- **해금 시점**: 영웅 레벨 3에서 룬 메뉴가 열린다. [추정] ExitLag 가이드(검색 요약으로만 확인, 원문 미열람)
+- **해금 시점**: 아무 영웅이나 레벨 3에 도달하면 룬 트리가 열린다. [확인: 비공식 2곳 일치] probonk 가이드 https://probonk.com/tbh-task-bar-hero/guides/rune-tree-progression (직접 열람), ExitLag 가이드(검색 요약)
 - **초기화(respec)**: **공식 초기화 기능의 존재를 확인하지 못했다.** [미확인]
   - 공식 패치노트 117건 전체에 룬 초기화·환급 언급이 없다. [확인]
   - Steam 토론 "Rune Reset"(2026-06-02): 이용자가 "룬을 초기화할 방법을 찾지 못했다, 초기화 아이템/기능을 달라"고 요청. [확인: 글 존재] → 출시 직후에는 초기화가 없었던 것으로 보인다. [추정]
   - 상충: ExitLag 가이드는 "트리는 전부 초기화 가능"이라 쓰고, 다른 팬 위키 FAQ는 "룬은 영구 업그레이드라 리스펙 대상이 아니다"라고 쓴다(둘 다 검색 요약으로만 확인). 설계 시에는 "초기화 없음(영구 구매)"을 원작 기본값으로 보고, 초기화는 독자 편의 기능으로 따로 판단하는 편이 안전하다.
   - 1.3.2 패치노트: "비정상 상황/조작으로 최대 레벨을 넘은 룬은 최대 레벨로 고정한다." [확인]
-- **이벤트 상자 예외**: 할로윈 상자는 일반·역병 지대 상자와 별도 보관(일반 40개/보스 40개)이며 "룬 효과가 적용되지 않는다". [확인] 1.3.0 패치노트
+- **이벤트 상자 예외**: 할로윈 상자는 일반·역병지대 상자와 별도 보관(일반 40개/보스 40개)이며 "룬 효과가 적용되지 않는다". [확인] 1.3.0 패치노트
 
 ### 1.2 버전별 노드 수 변화
 
@@ -50,8 +50,8 @@
 |---|---|---|
 | 플레이테스트(2026-04~05) | 미확인 | 이미 웨이브 수 감소 룬("Rune of Shortening" = 단축의 룬), 상자 보관 룬, 연금 골드 룬이 있었음. [확인] 0.01.02~0.01.05 패치노트 |
 | 출시~1.01.05 | **197** | [확인] taskbarhero.wiki(v1.00.17, 197노드), taskbarherowiki.com(v1.00.09, "197 runes"), taskbarhero.co(v1.00.09 기준·v1.00.13 보정, 스탯별 룬 개수 동일). 이 기간 패치노트에 룬 노드 추가 언급 없음 |
-| 1.02.00 (09-08) | 공식: "역병 지대 관련 룬 노드 **27개** + 그 외 **17개**(상자 드롭률 증가, 웨이브 수 감소 등) 추가" | [확인] 패치노트 |
-| 1.02.03 (09-14) | 공식: 역병 지대 일반 상자 드롭 확률 노드 1개 + 역병 지대 스테이지 보스 상자 드롭 확률 노드 1개 추가 | [확인] 패치노트 |
+| 1.02.00 (09-08) | 공식: "역병지대 관련 룬 노드 **27개** + 그 외 **17개**(상자 드롭률 증가, 웨이브 수 감소 등) 추가" | [확인] 패치노트 |
+| 1.02.03 (09-14) | 공식: 역병지대 일반 상자 드롭 확률 노드 1개 + 역병지대 스테이지 보스 상자 드롭 확률 노드 1개 추가 | [확인] 패치노트 |
 | 1.3.0 (10-22) | 공식: 오프라인 경험치 룬 3개 + 액트 보스 경험치 룬 2개 추가, 기존 액트 보스 경험치 룬 1개의 수치 +2,000 → +10,000/레벨 | [확인] 패치노트 |
 | v1.03.00 데이터 | **253** | [확인] shunshu DBAPP 스탯별 노드 수 합 = 253, tbhindex.com 제목 "All 253"(검색 결과) |
 
@@ -106,6 +106,9 @@
 | 편의·해금 | UnlockAutoOpenActBossChest | 태엽의 룬/Rune of the Mainspring | 1 | 1 | 해금 | 1,000,000 | 1 |
 | **합계** |  |  | **197** | **658** |  | **10,040,090,050** | **253** (역병 계열 34개 포함) |
 
+- 총비용 주석: 위 합계 10,040,090,050 G는 노드 409를 MaxLevel(5)까지만 센 값이다. 레벨 테이블 663행 전체 합은 10,040,515,050 G(409의 6~10레벨 425,000 G 포함)이고, 고립 노드 1133까지 빼면 10,035,090,050 G다.
+- v1.03.00 열의 노드 수가 다른 스탯이 1.02.00 이후 노드가 추가된 곳이다(1.6). v1.03.00에는 이 표에 없는 역병지대 전용 스탯 11종(노드 34개)이 더 있다.
+
 분류별 요약(v1.00.17):
 
 - **전투 능력치 룬(6종 스탯, 20개 노드, 약 2,175만 G)**: 전 영웅 공격력 +12(고정) / +60%(증가), 방어력 +90 / +35%, 공격속도 +21%, 이동속도 +44%. 트리 전체 비용의 0.2%에 불과하다 — 룬 트리의 무게중심은 전투가 아니라 파밍·편의 쪽에 있다.
@@ -136,6 +139,7 @@
 - 재물(10)에서 동쪽으로 탐색/정복 사슬(101~128, 상자 드롭), 서쪽으로 재물 사슬(201~215, 골드). 성장(20)에서 서쪽으로 성장 사슬(301~315, 경험치), 동쪽으로 전투 사슬(401~414).
 - 확장 줄기 꼭대기(16)에서 서쪽(1801~1808)·동쪽(1901~1908)으로 고가 확장 사슬이 뻗고, 거기에 오프라인 보상·자동 열기 단축 노드가 매달린다.
 - 사슬형 가지는 "A 스탯 노드 → B 스탯 노드"가 번갈아 나오고(탐색↔정복, 골드%↔보스 골드, 경험치%↔보스 경험치), 일정 간격으로 곁가지(보관량, 큐브, 고정 추가량)가 붙는 구조다.
+- 교차 확인: Steam 가이드 "Task Bar Hero 101"(2026-06-09)도 같은 방위 구성을 서술한다 — 남쪽 = 편성 슬롯, 북동 = 상자 드롭·보관, 남동 = 전 영웅 공격/방어/속도, 남서 = 경험치, 북서 = 골드, 최북단 = 인벤토리·창고·자동 열기(일반 300초/스테이지 보스 600초, 첫 단축 노드 −9초/−15초). [확인: 데이터와 일치]
 
 ### 1.5 노드 전체 표 — **v1.00.17 (1.02.00 이전)**, 197개
 
@@ -405,22 +409,22 @@ v1.03.00 DB의 스탯별 집계(노드 수, "레벨당 수치"의 노드 합, �
 | DropChancePlagueNormalChestPercent | Plague Rune of Exploration | 0 | 4 | +4 | 500 → 50% | 20 |
 | DropChancePlagueStageBossChestPercent | Plague Rune of Conquest | 0 | 3 | +3 | 1100 → 110% | 15 |
 | OfflineRewardExpPercent | Rune of Training | 5 | 8 | +3 | 150 → 15% | 15 |
-| WaveCountReduction | Rune of Brevity | 1 | 3 | +2 | 2 → 2 | 12 |
-| MaxAmountPlagueNormalChest | Plague Rune of Containment | 0 | 5 | +5 | 5 → 5 | 30 |
-| MaxAmountPlagueStageBossChest | Plague Rune of the Vault | 0 | 5 | +5 | 5 → 5 | 30 |
-| MaxAmountPlagueActBossChest | Plague Rune of Infinity | 0 | 5 | +5 | 5 → 5 | 30 |
-| UnlockAutoOpenPlagueNormalChest | Plague Rune of the Mainspring | 0 | 1 | +1 | 600 → 600 | 6 |
-| UnlockAutoOpenPlagueStageBossChest | Plague Rune of the Mainspring | 0 | 1 | +1 | 1200 → 1200 | 6 |
-| UnlockAutoOpenPlagueActBossChest | Plague Rune of the Mainspring | 0 | 1 | +1 | 120 → 120 | 6 |
-| ReduceAutoOpenPlagueNormalChestTime | Plague Rune of Lubrication | 0 | 3 | +3 | 12 → 12 | 15 |
-| ReduceAutoOpenPlagueStageBossChestTime | Plague Rune of Lubrication | 0 | 3 | +3 | 24 → 24 | 15 |
-| ReduceAutoOpenPlagueActBossChestTime | Plague Rune of Lubrication | 0 | 3 | +3 | 3 → 3 | 15 |
+| WaveCountReduction | Rune of Brevity | 1 | 3 | +2 | 2 → 2 | 노드당 1레벨 |
+| MaxAmountPlagueNormalChest | Plague Rune of Containment | 0 | 5 | +5 | 5 → 5 | 노드당 1레벨 |
+| MaxAmountPlagueStageBossChest | Plague Rune of the Vault | 0 | 5 | +5 | 5 → 5 | 노드당 1레벨 |
+| MaxAmountPlagueActBossChest | Plague Rune of Infinity | 0 | 5 | +5 | 5 → 5 | 노드당 1레벨 |
+| UnlockAutoOpenPlagueNormalChest | Plague Rune of the Mainspring | 0 | 1 | +1 | 기본 대기 600초 | 노드당 1레벨 |
+| UnlockAutoOpenPlagueStageBossChest | Plague Rune of the Mainspring | 0 | 1 | +1 | 기본 대기 1200초 | 노드당 1레벨 |
+| UnlockAutoOpenPlagueActBossChest | Plague Rune of the Mainspring | 0 | 1 | +1 | 기본 대기 120초 | 노드당 1레벨 |
+| ReduceAutoOpenPlagueNormalChestTime | Plague Rune of Lubrication | 0 | 3 | +3 | 12초 | 15 |
+| ReduceAutoOpenPlagueStageBossChestTime | Plague Rune of Lubrication | 0 | 3 | +3 | 24초 | 15 |
+| ReduceAutoOpenPlagueActBossChestTime | Plague Rune of Lubrication | 0 | 3 | +3 | 3초 | 15 |
 
 - "추가분 레벨당 수치 합"은 새 노드들의 1레벨당 수치를 노드끼리 더한 값이다(예: 전 영웅 공격력% 새 노드 1개 = 레벨당 2%, 5레벨 → 합 10%). 보관량·자동 열기 해금·웨이브 감소 노드는 노드당 1레벨이다(shunshu DB의 "총 레벨" 집계는 1레벨 노드를 6으로 세는 표기 특성이 있어 그 열은 다레벨 노드에만 유효하다).
 - 액트 보스 경험치: 기존 노드 1개가 +2,000 → +10,000/레벨로 바뀌었다(공식). v1.00.17 표에서 +2,000/레벨인 노드는 3152뿐이므로 이 노드로 보인다 [추정]. 그 변경을 반영하면 새 노드 2개의 레벨당 수치 합은 7,000이다.
 - 오프라인 경험치: 새 노드 3개, 각 5레벨, 합 레벨당 15%(노드당 5% 추정) → 최대 +75%p 추가.
-- 역병 지대 전용 자동 열기 기본 대기: 일반 600초(10분), 스테이지 보스 1,200초(20분), 액트 보스 120초(2분) — 일반 지역의 2배. 단축 합계: 일반 −60초, 스테이지 보스 −120초, 액트 보스 −15초(각 3노드×5레벨). [확인: shunshu 원시값] tbhindex 표기(−60s/−120s/−15s, 검색 요약)와 일치.
-- 역병 지대 상자 드롭 확률 계수: 일반 상자 4노드×5레벨 합 +250%, 스테이지 보스 상자 3노드×5레벨 합 +550%. [확인: shunshu 원시 500/1100 ×5레벨÷10] 일반 쪽은 tbhindex "250% at max"와 일치.
+- 역병지대 전용 자동 열기 기본 대기: 일반 600초(10분), 스테이지 보스 1,200초(20분), 액트 보스 120초(2분) — 일반 지역의 2배. 단축 합계: 일반 −60초, 스테이지 보스 −120초, 액트 보스 −15초(각 3노드×5레벨). [확인: shunshu 원시값] tbhindex 표기(−60s/−120s/−15s, 검색 요약)와 일치.
+- 역병지대 상자 드롭 확률 계수: 일반 상자 4노드×5레벨 합 +250%, 스테이지 보스 상자 3노드×5레벨 합 +550%. [확인: shunshu 원시 500/1100 ×5레벨÷10] 일반 쪽은 tbhindex "250% at max"와 일치.
 
 tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직접 열람 실패 — 아래 수치는 **검색 엔진 요약으로만** 확인) [추정]:
 
@@ -456,7 +460,7 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 
 - 펫은 **전투에 참여하지 않는다**. 효과는 전부 파밍 보너스(경험치, 처치 골드, 상자 드롭 확률 계수)이며 전투 스탯·자동 줍기 같은 기능형 펫은 없다. [확인] 펫 스탯 테이블(11행)에 등장하는 스탯이 4종뿐(IncreaseExpAmount, IncreaseGoldAmount, DropChanceNormalChestPercent, DropChanceStageBossChestPercent)
 - **보유 효과만 있고 장착 효과는 없다**: 해금한 펫의 효과는 그 펫을 편성(배치)하지 않아도 항상 적용되며, 모든 보유 펫의 효과가 동시에 중첩된다. [확인] 플레이테스트 0.01.04 패치노트 "펫을 배치하지 않아도 보유 효과가 적용된다는 안내를 펫 설명에 추가", shunshu DBAPP·Mobalytics(검색 요약) 일치
-- 편성(Formation) UI에서 펫을 골라 화면에 데리고 다닐 수 있다(외형). 동시에 배치 가능한 수는 [미확인](1마리로 보임 [추정]).
+- 편성(Formation) 화면에서 펫을 배치할 수 있지만 **순수 외형용**이다(배치 여부와 무관하게 보유 효과 적용). [확인] Steam 가이드 "Task Bar Hero 101"(2026-06-09 갱신) + 위 공식 패치노트. 동시에 배치 가능한 수는 [미확인](1마리로 보임 [추정]).
 - **펫 레벨/성장 없음**: 펫 테이블 필드는 키·이름·설명·스탯 키·해금 조건·파라미터 2개뿐이고 레벨·경험치·등급 필드가 없다. **등급(희귀도) 구분도 없다.** [확인] `/data/t/pets.json`
 - 획득 경로 3종: (1) 특정 몬스터 누적 처치(`KillMonster`), (2) DLC "Supporter Pack"(Steam appid 4427390, 출시가 $3.99, 펫 3종), (3) 기간 한정 이벤트(역시 누적 처치). 부화·뽑기·상점 구매(게임 내 재화)는 없다. [확인]
 - 적용 범위: 계정 공통(스탯이 전부 계정 단위 파밍 스탯). [확인]
@@ -473,10 +477,10 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 | 6001 | 검 / Sword | Supporter Pack DLC 보유 | 경험치 150 → +15% | 출시 |
 | 6002 | 나비 / Butterfly | Supporter Pack DLC 보유 | 처치 골드 100 → +10% | 출시 |
 | 6003 | 드래곤 / Dragon | Supporter Pack DLC 보유 | 일반 상자 드롭 확률 계수 200 → +20%, 처치 골드 150 → +15%, 경험치 200 → +20% | 출시 |
-| 2001 | Pumpkin Candy | 할로윈 이벤트 스테이지의 Jack-o' Skeleton Warrior(5000102) 500마리 처치 | 처치 골드 +1% | 1.3.0 (이벤트 종료 2026-11-11 23:59 UTC, 이후 획득 불가) |
-| 2002 | Pumpkin Ghost | 같은 스테이지의 Jack-o'-Lantern Ghost(5000103) 500마리 처치 | 경험치 +1% | 1.3.0 (동일) |
+| 2001 | 호박 캔디 / Pumpkin Candy | 할로윈 이벤트 스테이지 "잭-오 랜턴 협곡"의 잭-오 해골 전사(Jack-o' Skeleton Warrior, 5000102) 500마리 처치 | 처치 골드 +1% | 1.3.0 (이벤트 종료 2026-11-11 23:59 UTC, 이후 획득 불가) |
+| 2002 | 호박 유령 / Pumpkin Ghost | 같은 스테이지의 잭-오 랜턴 유령(Jack-o'-Lantern Ghost, 5000103) 500마리 처치 | 경험치 +1% | 1.3.0 (동일) |
 
-- 출처: https://taskbarhero.wiki/pets (내장 `/data/t/pets.json`, `/data/t/pet_stats.json`, v1.00.17), https://flex.shunshu-labo.org/en/tbh/pet/ (v1.03.00), 1.3.0 패치노트. 세 출처 수치 일치. [확인] (할로윈 펫 2종의 한국어 공식 명칭은 [미확인])
+- 출처: https://taskbarhero.wiki/pets (내장 `/data/t/pets.json`, `/data/t/pet_stats.json`, v1.00.17), https://flex.shunshu-labo.org/en/tbh/pet/ (v1.03.00), 1.3.0 패치노트. 세 출처 수치 일치. [확인] 할로윈 펫의 한국어 이름은 공식 한국어 패치노트 기준.
 - 펫 스탯 테이블의 모드 타입은 전부 `FLAT`. [확인]
 - 전 펫 보유 시 합계: 경험치 +51%, 처치 골드 +41%, 일반 상자 드롭 계수 +45%, 스테이지 보스 상자 드롭 계수 +25%. 무과금(DLC·이벤트 제외) 합계: 경험치 +15%, 골드 +15%, 일반 상자 +25%, 스테이지 보스 상자 +25%. [확인: 표의 합산]
 - 대표 파밍 스테이지(taskbarhero.wiki 계산, v1.00.17): 박쥐 = 1-7 City Outskirts, 감시자 = 2-5 Scorching Dunes, 불타는 해골 = 2-8 Sacred Tomb, 파란 골렘 = 3-6 Burning Ravine, 검은 정령 = 3-4 Frozen Glacier Cavern. [추정: 사이트 계산값]
@@ -486,54 +490,54 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 
 ## 3. 유물(Relic) 시스템 — **1.3.0(2026-10-22) 추가, 수치는 v1.03.00**
 
-용어: 이 문서에서는 Relic = 유물, Reliquary = 유물함, Resonance = 공명, Attunement = 조율, Offering = 봉헌(큐브 레시피)으로 적는다. 한국어 클라이언트의 공식 번역어는 [미확인].
+용어(공식 한국어 패치노트 "할로윈, 유물 업데이트 [Ver 1.3.0]" 기준 [확인]): Relic = **유물**, Reliquary = **유물함**, Resonance = **공명(효과)**, Attunement = **조율**, Offering = **기원**(큐브 레시피), Inherent Stats = **고정 속성**, Relic Slot = 유물 슬롯, White Relic = 하얀 유물, Plaguelands = 역병지대, Contaminated = 오염된. 등급 한국어/영문 대응: 일반 Common · 고급 Uncommon · 희귀 Rare · 전설 Legendary · 불멸 Immortal · 아르카나 Arcana · 초월 Beyond · 천상 Celestial · 신성 Divine · 우주 Cosmic. 개별 유물·유물함의 한국어 이름은 [미확인](영문 데이터 이름으로 적는다).
 
 ### 3.1 구조 [확인 — 공식 1.3.0 패치노트]
 
-- **해금**: 역병 지대(Plaguelands)를 1회 이상 클리어하면 유물 UI가 열린다. (게임 내 잠금 문구 기준으로는 Nightmare 역병 지대 클리어 — shunshu·Steam 가이드 [확인: 2개 출처])
-- **유물함(Reliquary)**: 장착하는 "받침"이다. 등급마다 무작위 **고유 능력치(Inherent Stats)**가 붙고, 그 효과는 **파티원 전원**에게 적용된다. Uncommon 이상은 무작위 색의 **유물 슬롯**을 가진다.
-- **유물(Relic)**: 유물함의 슬롯에 끼운다. 유물 종류마다 정해진 고유 능력치 1개를 가지며 역시 **파티원 전원**에게 적용된다. 유물에는 색이 있고 **같은 색 슬롯에만** 들어간다. **흰색 유물은 어떤 색 슬롯에도** 들어간다.
-- **공명(Resonance)**: 일부 유물함에는 공명 효과가 있다. 그 유물함에 끼운 유물의 색 구성이 조건(예: 빨강 2 + 파랑 1)을 만족하면 발동하고, 파티원 전원에게 특수 효과를 준다.
-- **획득**: 역병 지대 보물 상자와 "오염된 액트 보스" 보물 상자에서 일정 확률로 **오염된 유물함 / 오염된 유물**(재료 아이템)이 나온다. 이것을 큐브의 **봉헌** 레시피에 넣으면 무작위 유물함/유물이 된다.
+- **해금**: 역병지대(Plaguelands)를 1회 이상 클리어하면 유물 UI가 열린다. (게임 내 잠금 문구 기준으로는 Nightmare 역병지대 클리어 — shunshu·Steam 가이드 [확인: 2개 출처])
+- **유물함(Reliquary)**: 장착하는 "받침"이다. 등급마다 무작위 **고정 속성(Inherent Stats)**가 붙고, 그 효과는 **파티원 전원**에게 적용된다. 고급 이상은 무작위 색의 **유물 슬롯**을 가진다. (공식 문구: 고급 등급 이상의 유물함에 무작위 색상의 유물 슬롯)
+- **유물(Relic)**: 유물함의 슬롯에 끼운다. 유물 종류마다 정해진 고정 속성 1개를 가지며 역시 **파티원 전원**에게 적용된다. 유물에는 색이 있고 **같은 색 슬롯에만** 들어간다. **흰색 유물은 어떤 색 슬롯에도** 들어간다.
+- **공명(Resonance)**: 일부 유물함에는 공명 효과가 있다. 그 유물함에 끼운 유물의 색 구성이 조건(예: 빨강 2 + 파랑 1)을 만족하면 발동하고, 파티원 전원에게 특수 효과를 준다. (공식 패치노트 문장은 "특정 유물에는 공명 효과가 존재"라고 쓰지만, 데이터와 가이드 모두 공명 효과·조건은 **유물함**에 달려 있다.)
+- **획득**: 역병지대 보물 상자와 "오염된 액트 보스" 보물 상자에서 일정 확률로 **오염된 유물함 / 오염된 유물**(재료 아이템)이 나온다. 이것을 큐브의 **기원** 레시피에 넣으면 무작위 유물함/유물이 된다.
 - **합성**: 유물함과 유물 모두 큐브의 합성(Synthesis) 레시피로 합성할 수 있다.
-- **조율(Attunement)**: 1.3.0에서 추가된 큐브 레시피. 골드를 써서 유물함은 **슬롯 색을 재추첨**(모든 색 동일 확률), 유물은 **고유 능력치 수치를 범위 안에서 재추첨**한다. 비용은 아이템별로 시도할 때마다 오르다가 상한에서 멈춘다.
+- **조율(Attunement)**: 1.3.0에서 추가된 큐브 레시피. 골드를 써서 유물함은 **슬롯 색을 재추첨**(모든 색 동일 확률), 유물은 **고정 속성 수치를 범위 안에서 재추첨**한다. 비용은 아이템별로 시도할 때마다 오르다가 상한에서 멈춘다.
 
 보충 [확인 — shunshu 가이드, Steam 가이드(Killdozer), 업적 목록이 서로 일치]:
 
-- **장착 수**: 유물함은 **최대 2개** 장착. 두 번째 장착 칸은 "Hell 역병 지대 – 역병 강도 10" 클리어로 열린다. 업적 "Double Resonance"(공명 효과 2개 동시 발동)가 이를 뒷받침한다.
+- **장착 수**: 유물함은 **최대 2개** 장착. 두 번째 장착 칸은 "Hell 역병지대 – 역병 강도 10" 클리어로 열린다. 업적 "Double Resonance"(공명 효과 2개 동시 발동)가 이를 뒷받침한다.
 - 공명 조건은 **유물함 단위로** 센다(다른 유물함에 끼운 유물은 합산하지 않음 — shunshu. Steam 가이드는 "게임 내에서 확인하라"고 유보) [추정].
-- 봉헌으로 얻은 유물함/유물은 **거래 불가**(오염된 재료 상태일 때는 Steam 장터 거래 가능 — 장터에 "Contaminated Relic (Arcana)" 등 등록 확인).
+- 기원으로 얻은 유물함/유물은 **거래 불가**(오염된 재료 상태일 때는 Steam 장터 거래 가능 — 장터에 "Contaminated Relic (Arcana)" 등 등록 확인).
 - 유물 색은 5종: 빨강(Crimson), 파랑(Azure), 노랑(Golden), 보라(Violet), 흰색(White). 색과 등급은 독립이다.
-- 한 유물함의 최대 슬롯은 8(Cosmic). 업적 "Reliquary Complete"(8슬롯 전부 장착).
+- 한 유물함의 최대 슬롯은 8(우주). 업적 "Reliquary Complete"(8슬롯 전부 장착).
 
-### 3.2 유물함 등급별 슬롯 수·고유 능력치 수·능력치 풀
+### 3.2 유물함 등급별 슬롯 수·고정 속성 수·능력치 풀
 
-- 고유 능력치는 아래 9종 풀에서 등급별 범위로 무작위 추첨된다(풀은 모든 유물함 공통, 풀의 행 가중치는 동일). 조율로는 바뀌지 않는다(조율은 슬롯 색만). [확인] shunshu `relicPools`, Steam 가이드
+- 고정 속성는 아래 9종 풀에서 등급별 범위로 무작위 추첨된다(풀은 모든 유물함 공통, 풀의 행 가중치는 동일). 조율로는 바뀌지 않는다(조율은 슬롯 색만). [확인] shunshu `relicPools`, Steam 가이드
 - 표의 수치는 표시값(%) 범위. 원시값은 표시값×10(저항 2종은 원시값=표시값).
 
-| 등급 | 유물 슬롯 수 | 고유 능력치 줄 수 | 공격력 증가(%) (AttackDamage:ADDITIVE) | 최대 HP 증가(%) (MaxHp:ADDITIVE) | 치명타 피해(+%p) (CriticalDamage:FLAT) | 공격·시전 속도 증가(%) (AttackAndCastSpeed:ADDITIVE) | 재사용 대기시간 감소(+%) (CooldownReduction:FLAT) | 모든 원소 저항(+%) (AllElementalResistance:FLAT) | 혼돈 저항(+%) (ChaosResistance:FLAT) | 피해 감소(+%) (DamageReduction:FLAT) | 이동속도 증가(%) (MovementSpeed:ADDITIVE) |
+| 등급 | 유물 슬롯 수 | 고정 속성 줄 수 | 공격력 증가(%) (AttackDamage:ADDITIVE) | 최대 HP 증가(%) (MaxHp:ADDITIVE) | 치명타 피해(+%p) (CriticalDamage:FLAT) | 공격·시전 속도 증가(%) (AttackAndCastSpeed:ADDITIVE) | 재사용 대기시간 감소(+%) (CooldownReduction:FLAT) | 모든 원소 저항(+%) (AllElementalResistance:FLAT) | 혼돈 저항(+%) (ChaosResistance:FLAT) | 피해 감소(+%) (DamageReduction:FLAT) | 이동속도 증가(%) (MovementSpeed:ADDITIVE) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Common | 0 | 1 | 5~10 | 5~8 | 10~15 | 4~5 | 3~5 | 4~8 | 10~20 | 3~5 | 10~20 |
-| Uncommon | 1 | 1 | 10~15 | 8~11 | 15~20 | 5~6 | 3.5~5.5 | 6~10 | 13~23 | 3.5~5.5 | 13~23 |
-| Rare | 2 | 1 | 15~20 | 11~14 | 20~25 | 6~7 | 4~6 | 8~12 | 17~27 | 4~6 | 16~26 |
-| Legendary | 3 | 1 | 20~25 | 14~17 | 25~30 | 7~9 | 4.5~6.5 | 10~14 | 20~30 | 4.5~6.5 | 18~28 |
-| Immortal | 3 | 2 | 25~30 | 17~20 | 30~35 | 9~11 | 5~7 | 12~16 | 23~33 | 5~7 | 21~31 |
-| Arcana | 4 | 2 | 30~35 | 20~25 | 35~40 | 11~13 | 5.5~7.5 | 14~18 | 27~37 | 5.5~7.5 | 24~34 |
-| Beyond | 5 | 2 | 35~40 | 25~30 | 40~45 | 13~15 | 6~8 | 16~20 | 30~40 | 6~8 | 27~37 |
-| Celestial | 6 | 2 | 40~45 | 30~35 | 50~60 | 15~17 | 6.5~8.5 | 18~22 | 33~43 | 6.5~8.5 | 29~39 |
-| Divine | 7 | 2 | 45~50 | 35~40 | 60~70 | 17~20 | 7~9 | 20~25 | 37~47 | 7~9 | 32~42 |
-| Cosmic | 8 | 3 | 50~55 | 40~50 | 70~80 | 20~25 | 7.5~9.5 | 25~30 | 40~50 | 7.5~9.5 | 35~45 |
+| 일반 | 0 | 1 | 5~10 | 5~8 | 10~15 | 4~5 | 3~5 | 4~8 | 10~20 | 3~5 | 10~20 |
+| 고급 | 1 | 1 | 10~15 | 8~11 | 15~20 | 5~6 | 3.5~5.5 | 6~10 | 13~23 | 3.5~5.5 | 13~23 |
+| 희귀 | 2 | 1 | 15~20 | 11~14 | 20~25 | 6~7 | 4~6 | 8~12 | 17~27 | 4~6 | 16~26 |
+| 전설 | 3 | 1 | 20~25 | 14~17 | 25~30 | 7~9 | 4.5~6.5 | 10~14 | 20~30 | 4.5~6.5 | 18~28 |
+| 불멸 | 3 | 2 | 25~30 | 17~20 | 30~35 | 9~11 | 5~7 | 12~16 | 23~33 | 5~7 | 21~31 |
+| 아르카나 | 4 | 2 | 30~35 | 20~25 | 35~40 | 11~13 | 5.5~7.5 | 14~18 | 27~37 | 5.5~7.5 | 24~34 |
+| 초월 | 5 | 2 | 35~40 | 25~30 | 40~45 | 13~15 | 6~8 | 16~20 | 30~40 | 6~8 | 27~37 |
+| 천상 | 6 | 2 | 40~45 | 30~35 | 50~60 | 15~17 | 6.5~8.5 | 18~22 | 33~43 | 6.5~8.5 | 29~39 |
+| 신성 | 7 | 2 | 45~50 | 35~40 | 60~70 | 17~20 | 7~9 | 20~25 | 37~47 | 7~9 | 32~42 |
+| 우주 | 8 | 3 | 50~55 | 40~50 | 70~80 | 20~25 | 7.5~9.5 | 25~30 | 40~50 | 7.5~9.5 | 35~45 |
 
-- 슬롯 수/능력치 줄 수: Legendary와 Immortal은 슬롯이 같고(3) 능력치 줄 수만 1→2로 늘어난다. 3줄은 Cosmic뿐. [확인] shunshu 등급 데이터, Steam 가이드 서술 일치
+- 슬롯 수/능력치 줄 수: 전설와 불멸은 슬롯이 같고(3) 능력치 줄 수만 1→2로 늘어난다. 3줄은 우주뿐. [확인] shunshu 등급 데이터, Steam 가이드 서술 일치
 - 모드 타입: `ADDITIVE` = "증가(Increased) %" 풀에 합산, `FLAT` = 해당 스탯에 그대로 가산(7절).
 
 ### 3.3 유물 36종(색별) × 10등급 = 360변형
 
 - 수치는 등급별 **표시값 범위**(추첨 범위, 조율로 재추첨). % 스탯은 원시값÷10, 저항류는 원시값 그대로, 초당 HP 재생은 원시값÷100, 고정값 스탯은 그대로.
 - 색별 개수: 빨강 9, 파랑 7, 노랑 10, 보라 8, 흰색 2. [확인] shunshu DBAPP, tbhindex(검색 요약: Red 90 / Blue 70 / Yellow 100 / Purple 80 / White 20 = 360), Steam 가이드 일치
-- "Echo" 유물(색마다 1종, 총 5종)은 공명 조건을 셀 때 **2개로 계산**되는 대신 페널티 능력치를 가진다(빨강=화염 저항 감소, 파랑=냉기, 노랑=번개, 보라=혼돈, 흰색=공격력 감소). 페널티는 등급이 오를수록 줄고 Cosmic에서 0이 된다. Echo의 2개 계산은 능력치를 2배로 만들지 않는다.
+- "Echo" 유물(색마다 1종, 총 5종)은 공명 조건을 셀 때 **2개로 계산**되는 대신 페널티 능력치를 가진다(빨강=화염 저항 감소, 파랑=냉기, 노랑=번개, 보라=혼돈, 흰색=공격력 감소). 페널티는 등급이 오를수록 줄고 우주에서 0이 된다. Echo의 2개 계산은 능력치를 2배로 만들지 않는다.
 
-| ID | 이름 | 색 | 고유 능력치(스탯ID:모드) | Common | Uncommon | Rare | Legendary | Immortal | Arcana | Beyond | Celestial | Divine | Cosmic | 비고 |
+| ID | 이름 | 색 | 고정 속성(스탯ID:모드) | 일반 | 고급 | 희귀 | 전설 | 불멸 | 아르카나 | 초월 | 천상 | 신성 | 우주 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 710001 | Crimson Relic - Blade | 빨강(Crimson) | 공격력 증가(%) (AttackDamage:ADDITIVE) | 2~6 | 3~8 | 4.5~10 | 6~12.5 | 7.5~15 | 9~17.5 | 10.5~20 | 12~23 | 13~25.5 | 14~28 |  |
 | 710002 | Crimson Relic - Fang | 빨강(Crimson) | 체력 100% 적 대상 치명타 확률 계수 증가(%) (FullHpTargetCriticalChance:ADDITIVE) | 10~32.5 | 15~42.5 | 25~52.5 | 32.5~67.5 | 40~80 | 47.5~95 | 57.5~107.5 | 65~122.5 | 70~137.5 | 75~150 |  |
@@ -555,7 +559,7 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 | 730002 | Golden Relic - Shield | 노랑(Golden) | 막기 확률(+%) (BlockChance:FLAT) | 2~6 | 3~8 | 4~10 | 5~12 | 6~14 | 8~16 | 9~18 | 10~20 | 12~23 | 13~25 |  |
 | 730003 | Golden Relic - Halo | 노랑(Golden) | 원소 막기 확률(+%) (ElementalBlockChance:FLAT) | 2~6 | 3~8 | 4~10 | 5~12 | 6~14 | 8~16 | 9~18 | 10~20 | 12~23 | 13~25 |  |
 | 730004 | Golden Relic - Rampart | 노랑(Golden) | 피해 감소(+%) (DamageReduction:FLAT) | 0.8~2.5 | 1~3.2 | 1.2~3.8 | 1.9~4.4 | 2.5~5 | 3.2~6.2 | 3.8~6.9 | 4.4~8.2 | 4.8~8.8 | 5~10 |  |
-| 730005 | Golden Relic - Broken Chain | 노랑(Golden) | 군중제어 지속시간 감소(+%) (CrowdControlDurationReduction:FLAT) | 2~6 | 3~8 | 4~10 | 5~12 | 6~14 | 8~16 | 9~18 | 10~20 | 12~23 | 13~25 | 봉헌 결과 풀에 없음(DB 기준) |
+| 730005 | Golden Relic - Broken Chain | 노랑(Golden) | 군중제어 지속시간 감소(+%) (CrowdControlDurationReduction:FLAT) | 2~6 | 3~8 | 4~10 | 5~12 | 6~14 | 8~16 | 9~18 | 10~20 | 12~23 | 13~25 | 기원 결과 풀에 없음(DB 기준) |
 | 730006 | Golden Relic - Coin | 노랑(Golden) | 처치 시 골드(+고정값) (GoldAmount:FLAT) | 4~12 | 6~16 | 8~20 | 10~24 | 12~28 | 16~32 | 18~36 | 20~40 | 24~46 | 26~50 |  |
 | 730007 | Golden Relic - Thunderbolt | 노랑(Golden) | 번개 저항(+%) (LightningResistance:FLAT) | 5~15 | 6~17 | 8~20 | 10~23 | 12~26 | 14~29 | 16~32 | 18~35 | 20~38 | 22~40 |  |
 | 730008 | Golden Relic - Scale | 노랑(Golden) | 피격 시 일시적 받는 피해 감소(+%) (OnHitDamageReduction:FLAT) | 1.7~5 | 2~6.3 | 2.5~7.5 | 3.8~8.8 | 5~10 | 6.3~12.5 | 7.5~13.8 | 8.8~16.3 | 9.5~17.5 | 10~20 |  |
@@ -578,136 +582,137 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 
 - "존재 등급"은 그 유물함이 나오는 등급 범위, "공명 발동 가능 등급"은 그보다 낮은 등급이 "Unfinished(미완성) 유물함"으로 표시되어 공명 효과가 없는 경계다. 같은 이름이라도 ID가 다르면 조건과 수치가 다르다(높은 등급대의 것이 조건이 까다롭고 효과가 크다).
 - 효과 수치의 범위(예: 5~9%)는 유물함 개체마다 그 범위 안에서 정해지는 값이다 [추정: 범위의 추첨 시점은 미확인].
-- 등급대별 개수: Common부터 18종, Immortal부터 20종, Arcana부터 5종, Celestial부터 19종 → 변형 수 18×10 + 20×6 + 5×5 + 19×3 = 382. [확인] shunshu 데이터 계산 = tbhindex "382 Reliquaries"(검색 요약)
+- 등급대별 개수: 일반부터 18종, 불멸부터 20종, 아르카나부터 5종, 천상부터 19종 → 변형 수 18×10 + 20×6 + 5×5 + 19×3 = 382. [확인] shunshu 데이터 계산 = tbhindex "382 Reliquaries"(검색 요약)
 - tbhindex는 공명 효과를 63개로 센다(검색 요약). 본 데이터는 62행이다. 차이 1의 원인은 [미확인].
 
 | ID | 이름 | 존재 등급 | 공명 발동 가능 등급 | 공명 조건(색×개수) | 공명 효과(mod ID) |
 |---|---|---|---|---|---|
-| 790001 | Relentless Reliquary | Common~Cosmic | Rare 이상 | 파랑×2 | 재사용 대기시간 감소(+%) 5~9 (`StatValueUp`) |
-| 790002 | Frostfire Reliquary | Common~Cosmic | Legendary 이상 | 빨강×2 + 파랑×1 | 빙결된 몬스터가 화염 피해를 받으면 빙결이 풀리고 점화가 걸림 (`FrozenFireIgnite`) |
-| 790003 | Hunter's Reliquary | Common~Cosmic | Legendary 이상 | 파랑×2 + 노랑×1 | 덫 폭발 시 10~20% 확률로 같은 자리에 같은 덫 1개 추가 설치(추가된 덫은 재복제 없음) (`TrapDuplicateChance`) |
-| 790004 | Onset Reliquary | Common~Cosmic | Rare 이상 | 빨강×2 | 스테이지 시작 후 각 파티원의 첫 공격 스킬이 확정 치명타 (`FirstSkillGuaranteedCrit`) |
-| 790005 | Executioner's Reliquary | Common~Cosmic | Legendary 이상 | 빨강×2 + 보라×1 | HP 5~10% 이하의 일반 몬스터 즉사 (`ExecuteLowHpNormalMonster`) |
-| 790006 | Mirror Reliquary | Common~Cosmic | Rare 이상 | 노랑×2 | 막아낸 피해의 100~200% 반사 (`BlockReflectDamage`) |
-| 790007 | Bulwark Reliquary | Common~Cosmic | Legendary 이상 | 노랑×3 | 전 파티원에게 레벨 1 수호의 축복(Blessing of Warding) 발동 (`ApplyBlessingLevel:40501`) |
-| 790008 | Might Reliquary | Common~Cosmic | Legendary 이상 | 빨강×3 | 전 파티원에게 레벨 1 힘의 축복(Blessing of Might) 발동 (`ApplyBlessingLevel:40201`) |
-| 790009 | Phoenix Reliquary | Common~Cosmic | Legendary 이상 | 빨강×2 + 노랑×1 | 파티원 사망 시 HP 10~20%로 부활(스테이지당 1회) (`ReviveFallenAlly`) |
-| 790010 | Oath Reliquary | Common~Cosmic | Legendary 이상 | 노랑×2 + 보라×1 | 최대 HP를 넘는 흡혈·처치 회복량의 50~150%만큼 주변 몬스터에 번개 피해 (`OverhealLightningDamage`) |
-| 790011 | Void Reliquary | Common~Cosmic | Legendary 이상 | 보라×3 | 모든 스킬이 가한 피해의 5~13%만큼 추가 혼돈 피해 (`SkillExtraChaosDamage`) |
-| 790013 | Commander's Reliquary | Common~Cosmic | Legendary 이상 | 빨강×1 + 노랑×2 | 스테이지 시작 시 무작위 파티원 1명이 리더가 되어 10~25% 커지고, 커진 비율만큼 최대 HP·피해 증가(파티 2명 이상일 때만) (`RandomLeaderBuff`) |
-| 790015 | Tranquil Reliquary | Common~Cosmic | Legendary 이상 | 파랑×4 | 파티의 재사용 대기시간 감소가 적용되지 않는 대신, 그 감소 1%당 스킬 피해 2% 증가 (`CooldownReductionToSkillDamage`) |
-| 790017 | Sanguine Reliquary | Common~Cosmic | Legendary 이상 | 빨강×2 + 보라×2 | 출혈 중인 몬스터가 죽으면 남은 지속시간만큼 주변 몬스터에 출혈 전이 (`BleedSpreadOnDeath`) |
-| 790018 | Ember Reliquary | Common~Cosmic | Legendary 이상 | 빨강×4 | 점화된 몬스터가 죽으면 가장 가까운 몬스터에 점화 새로 부여 (`IgniteSpreadOnDeath`) |
-| 790020 | Twin Reliquary | Common~Cosmic | Legendary 이상 | 파랑×2 + 노랑×2 | 투사체 스킬의 투사체 +1, 대신 투사체 피해 30% 감소 (`ProjectileCountUpDamageDown`) |
-| 790022 | Hunter's Reliquary | Common~Cosmic | Legendary 이상 | 빨강×1 + 노랑×2 | 덫 폭발 시 30~50% 확률로 같은 자리에 같은 덫 1개 추가 설치(추가된 덫은 재복제 없음) (`TrapDuplicateChance`) |
-| 790028 | Icicle Reliquary | Common~Cosmic | Legendary 이상 | 파랑×3 | 빙결된 몬스터 대상 치명타 피해 50~100% 증가, 대신 치명타 시 빙결 해제 (`FrozenTargetCritDamageUp`) |
-| 794012 | Forgotten King's Reliquary | Immortal~Cosmic | Immortal 이상 | 빨강×1 + 파랑×1 + 노랑×1 | 빈 파티 슬롯 1칸당 주는 피해 4~8% 증가·받는 피해 4~8% 감소 (`EmptySlotBonus`) |
-| 794014 | Swift Reliquary | Immortal~Cosmic | Immortal 이상 | 빨강×1 + 파랑×3 | 몬스터 처치 시 전 파티원 이동속도 1% 증가(5초), 최대 30~50중첩(스테이지 종료 또는 5초 경과 시 전부 소멸) (`KillStackPartyMoveSpeed`) |
-| 794019 | Chain Reaction Reliquary | Immortal~Cosmic | Arcana 이상 | 빨강×3 + 파랑×2 | 점화된 몬스터가 감전되면 폭발하여 반경 300 내 몬스터에 200% 화염 피해 (`IgniteShockExplosion`) |
-| 794021 | Vengeful Reliquary | Immortal~Cosmic | Immortal 이상 | 빨강×3 + 노랑×1 | 파티원 사망 시 생존 파티원의 피해 20~40% 증가(10초) (`AllyDeathAttackBuff`) |
-| 794023 | Executioner's Reliquary | Immortal~Cosmic | Arcana 이상 | 빨강×3 + 보라×2 | HP 11~15% 이하의 일반 몬스터 즉사 (`ExecuteLowHpNormalMonster`) |
-| 794024 | Phoenix Reliquary | Immortal~Cosmic | Arcana 이상 | 빨강×3 + 노랑×2 | 파티원 사망 시 HP 30~50%로 부활(스테이지당 1회) (`ReviveFallenAlly`) |
-| 794025 | Black Flame Reliquary | Immortal~Cosmic | Arcana 이상 | 빨강×2 + 보라×3 | 화염 피해를 혼돈 피해로 전환 (`ElementConvertToChaos`) |
-| 794026 | Black Frost Reliquary | Immortal~Cosmic | Arcana 이상 | 파랑×2 + 보라×3 | 냉기 피해를 혼돈 피해로 전환 (`ElementConvertToChaos`) |
-| 794027 | Black Lightning Reliquary | Immortal~Cosmic | Arcana 이상 | 노랑×2 + 보라×3 | 번개 피해를 혼돈 피해로 전환 (`ElementConvertToChaos`) |
-| 794029 | Relentless Reliquary | Immortal~Cosmic | Arcana 이상 | 파랑×4 | 재사용 대기시간 감소(+%) 10~20 (`StatValueUp`) |
-| 794030 | Mirror Reliquary | Immortal~Cosmic | Arcana 이상 | 파랑×2 + 노랑×3 | 막아낸 피해의 300~500% 반사 (`BlockReflectDamage`) |
-| 794031 | Commander's Reliquary | Immortal~Cosmic | Arcana 이상 | 빨강×3 + 노랑×2 | 스테이지 시작 시 무작위 파티원 1명이 리더가 되어 10~20% 커지고, 커진 비율만큼 최대 HP·피해 증가(파티 2명 이상일 때만) (`RandomLeaderBuff`) |
-| 794032 | Bitter Cold Reliquary | Immortal~Cosmic | Arcana 이상 | 파랑×5 | 모든 냉기 피해가 냉각(Chill) 부여, 대신 화염 피해 50% 감소 (`ColdCausesChillFireDamageDown`) |
-| 794033 | Oath Reliquary | Immortal~Cosmic | Arcana 이상 | 노랑×5 | 최대 HP를 넘는 흡혈·처치 회복량의 200~500%만큼 주변 몬스터에 번개 피해 (`OverhealLightningDamage`) |
-| 794035 | Companion's Reliquary | Immortal~Cosmic | Arcana 이상 | 파랑×2 + 노랑×4 | 소환수가 소환자의 치명타 확률을 이어받아 치명타 가능 (`SummonUseOwnerCritChance`) |
-| 794036 | Corrupt Reliquary | Immortal~Cosmic | Arcana 이상 | 보라×5 | 모든 혼돈 피해가 총 치명타 피해 수치의 20~40%만큼 증가, 대신 혼돈 피해는 치명타 불가 (`ChaosDamageCritConvert`) |
-| 794037 | Bulwark Reliquary | Immortal~Cosmic | Arcana 이상 | 노랑×4 + 보라×2 | 전 파티원에게 레벨 3~5 수호의 축복(Blessing of Warding) 발동 (`ApplyBlessingLevel:40501`) |
-| 794040 | Swift Reliquary | Immortal~Cosmic | Arcana 이상 | 빨강×2 + 파랑×4 | 몬스터 처치 시 전 파티원 이동속도 1% 증가(5초), 최대 60~100중첩(스테이지 종료 또는 5초 경과 시 전부 소멸) (`KillStackPartyMoveSpeed`) |
-| 794041 | Keen Reliquary | Immortal~Cosmic | Arcana 이상 | 빨강×4 + 파랑×2 | 비치명타 피해를 준 몬스터에게 주는 다음 피해가 치명타가 아니면 치명타 판정 1회 추가 (`NonCritRerollCrit`) |
-| 794042 | Vengeful Reliquary | Immortal~Cosmic | Arcana 이상 | 보라×4 + 노랑×2 | 파티원 사망 시 생존 파티원의 피해 50~100% 증가(10초) (`AllyDeathAttackBuff`) |
-| 795016 | Prism Reliquary | Arcana~Cosmic | Arcana 이상 | 빨강×1 + 파랑×1 + 노랑×1 + 보라×1 | 스테이지 진입 후 처음 준 원소 피해의 속성으로 고정: 해당 원소 피해 30~50% 증가, 다른 원소 피해는 불가 (`ElementLock`) |
-| 795034 | Condemnation Reliquary | Arcana~Cosmic | Arcana 이상 | 빨강×2 + 파랑×2 + 노랑×2 + 보라×2 | 주변 몬스터에 초당 30~70% 화염 피해 (`AuraFireDamagePerSecond`) |
-| 795038 | Might Reliquary | Arcana~Cosmic | Arcana 이상 | 빨강×4 + 노랑×1 | 전 파티원에게 레벨 3~5 힘의 축복(Blessing of Might) 발동 (`ApplyBlessingLevel:40201`) |
-| 795039 | Executioner's Reliquary | Arcana~Cosmic | Arcana 이상 | 빨강×3 + 보라×3 | HP 16~20% 이하의 일반 몬스터 즉사 (`ExecuteLowHpNormalMonster`) |
-| 795043 | Prism Reliquary | Arcana~Cosmic | Arcana 이상 | 빨강×2 + 파랑×2 + 노랑×1 + 보라×1 | 스테이지 진입 후 처음 준 원소 피해의 속성으로 고정: 해당 원소 피해 30~50% 증가, 다른 원소 피해는 불가 (`ElementLock`) |
-| 797044 | Vampire's Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×2 + 보라×5 | 흡혈 1.5~2배, 대신 초당 HP 재생·타격 시 회복·처치 시 회복 비활성(프리스트 치유 스킬은 예외) (`LifestealDoubleDisableOtherHeal`) |
-| 797045 | Pure Flame Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×7 | 모든 화염 피해가 점화 부여, 점화 피해 100% 증가 (`FireDamageAlwaysIgnite`) |
-| 797046 | Pure Frost Reliquary | Celestial~Cosmic | Celestial 이상 | 파랑×7 | HP 25~30% 이하의 빙결된 몬스터가 물리 피해를 받으면 즉사(보스는 기준치가 50%로 축소) (`FrozenPhysicalExecute`) |
-| 797047 | Pure Light Reliquary | Celestial~Cosmic | Celestial 이상 | 노랑×7 | 번개 피해가 치명타일 때 감전 부여, 감전된 적은 번개 피해 10~20% 추가로 받음 (`LightningCritShock`) |
-| 797048 | Pure Void Reliquary | Celestial~Cosmic | Celestial 이상 | 보라×7 | 모든 스킬이 가한 피해의 15~30%만큼 추가 혼돈 피해 (`SkillExtraChaosDamage`) |
-| 797049 | Forgotten King's Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×2 + 파랑×2 + 노랑×2 + 보라×2 | 빈 파티 슬롯 1칸당 주는 피해 9~18% 증가·받는 피해 9~18% 감소 (`EmptySlotBonus`) |
-| 797050 | Twinborn Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 파랑×4 | 점화된 적 대상 냉기 피해 25~50% 증가, 냉각된 적 대상 화염 피해 25~50% 증가 (`IgniteChillCrossDamage`) |
-| 797051 | Master's Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×2 + 파랑×2 + 노랑×2 + 보라×1 | 모든 스킬 레벨(+) 1~2 (`StatValueUp`) |
-| 797052 | Resonator Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×1 + 파랑×1 + 노랑×2 + 보라×2 | 장착한 다른 유물함의 공명 효과 수치 50% 증가 (`ResonanceValueUp`) |
-| 797053 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 파랑×2 + 노랑×4 | 기사(Knight)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
-| 797054 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 파랑×4 + 보라×2 | 레인저(Ranger)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
-| 797055 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 파랑×2 + 보라×4 | 소서러(Sorcerer)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
-| 797057 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 노랑×2 + 보라×4 | 헌터(Hunter)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
-| 797058 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 파랑×2 + 보라×4 | 슬레이어(Slayer)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
-| 797059 | Commander's Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 노랑×3 | 스테이지 시작 시 무작위 파티원 1명이 리더가 되어 30~50% 커지고, 커진 비율만큼 최대 HP·피해 증가(파티 2명 이상일 때만) (`RandomLeaderBuff`) |
-| 797060 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 파랑×4 + 노랑×2 | 기사(Knight)의 공격 스킬이 기본 공격 횟수 누적 없이 발동, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoBaseAttackCountMaxHpCost`) |
-| 797061 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 파랑×2 + 보라×4 | 레인저(Ranger)의 공격 스킬이 기본 공격 횟수 누적 없이 발동, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoBaseAttackCountMaxHpCost`) |
-| 797062 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 노랑×4 + 보라×2 | 헌터(Hunter)의 공격 스킬이 기본 공격 횟수 누적 없이 발동, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoBaseAttackCountMaxHpCost`) |
-| 797063 | Rampant Reliquary | Celestial~Cosmic | Celestial 이상 | 빨강×4 + 파랑×4 + 보라×2 | 슬레이어(Slayer)의 공격 스킬이 기본 공격 횟수 누적 없이 발동, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoBaseAttackCountMaxHpCost`) |
+| 790001 | Relentless Reliquary | 일반~우주 | 희귀 이상 | 파랑×2 | 재사용 대기시간 감소(+%) 5~9 (`StatValueUp`) |
+| 790002 | Frostfire Reliquary | 일반~우주 | 전설 이상 | 빨강×2 + 파랑×1 | 빙결된 몬스터가 화염 피해를 받으면 빙결이 풀리고 점화가 걸림 (`FrozenFireIgnite`) |
+| 790003 | Hunter's Reliquary | 일반~우주 | 전설 이상 | 파랑×2 + 노랑×1 | 덫 폭발 시 10~20% 확률로 같은 자리에 같은 덫 1개 추가 설치(추가된 덫은 재복제 없음) (`TrapDuplicateChance`) |
+| 790004 | Onset Reliquary | 일반~우주 | 희귀 이상 | 빨강×2 | 스테이지 시작 후 각 파티원의 첫 공격 스킬이 확정 치명타 (`FirstSkillGuaranteedCrit`) |
+| 790005 | Executioner's Reliquary | 일반~우주 | 전설 이상 | 빨강×2 + 보라×1 | HP 5~10% 이하의 일반 몬스터 즉사 (`ExecuteLowHpNormalMonster`) |
+| 790006 | Mirror Reliquary | 일반~우주 | 희귀 이상 | 노랑×2 | 막아낸 피해의 100~200% 반사 (`BlockReflectDamage`) |
+| 790007 | Bulwark Reliquary | 일반~우주 | 전설 이상 | 노랑×3 | 전 파티원에게 레벨 1 수호의 축복(Blessing of Warding) 발동 (`ApplyBlessingLevel:40501`) |
+| 790008 | Might Reliquary | 일반~우주 | 전설 이상 | 빨강×3 | 전 파티원에게 레벨 1 힘의 축복(Blessing of Might) 발동 (`ApplyBlessingLevel:40201`) |
+| 790009 | Phoenix Reliquary | 일반~우주 | 전설 이상 | 빨강×2 + 노랑×1 | 파티원 사망 시 HP 10~20%로 부활(스테이지당 1회) (`ReviveFallenAlly`) |
+| 790010 | Oath Reliquary | 일반~우주 | 전설 이상 | 노랑×2 + 보라×1 | 최대 HP를 넘는 흡혈·처치 회복량의 50~150%만큼 주변 몬스터에 번개 피해 (`OverhealLightningDamage`) |
+| 790011 | Void Reliquary | 일반~우주 | 전설 이상 | 보라×3 | 모든 스킬이 가한 피해의 5~13%만큼 추가 혼돈 피해 (`SkillExtraChaosDamage`) |
+| 790013 | Commander's Reliquary | 일반~우주 | 전설 이상 | 빨강×1 + 노랑×2 | 스테이지 시작 시 무작위 파티원 1명이 리더가 되어 10~25% 커지고, 커진 비율만큼 최대 HP·피해 증가(파티 2명 이상일 때만) (`RandomLeaderBuff`) |
+| 790015 | Tranquil Reliquary | 일반~우주 | 전설 이상 | 파랑×4 | 파티의 재사용 대기시간 감소가 적용되지 않는 대신, 그 감소 1%당 스킬 피해 2% 증가 (`CooldownReductionToSkillDamage`) |
+| 790017 | Sanguine Reliquary | 일반~우주 | 전설 이상 | 빨강×2 + 보라×2 | 출혈 중인 몬스터가 죽으면 남은 지속시간만큼 주변 몬스터에 출혈 전이 (`BleedSpreadOnDeath`) |
+| 790018 | Ember Reliquary | 일반~우주 | 전설 이상 | 빨강×4 | 점화된 몬스터가 죽으면 가장 가까운 몬스터에 점화 새로 부여 (`IgniteSpreadOnDeath`) |
+| 790020 | Twin Reliquary | 일반~우주 | 전설 이상 | 파랑×2 + 노랑×2 | 투사체 스킬의 투사체 +1, 대신 투사체 피해 30% 감소 (`ProjectileCountUpDamageDown`) |
+| 790022 | Hunter's Reliquary | 일반~우주 | 전설 이상 | 빨강×1 + 노랑×2 | 덫 폭발 시 30~50% 확률로 같은 자리에 같은 덫 1개 추가 설치(추가된 덫은 재복제 없음) (`TrapDuplicateChance`) |
+| 790028 | Icicle Reliquary | 일반~우주 | 전설 이상 | 파랑×3 | 빙결된 몬스터 대상 치명타 피해 50~100% 증가, 대신 치명타 시 빙결 해제 (`FrozenTargetCritDamageUp`) |
+| 794012 | Forgotten King's Reliquary | 불멸~우주 | 불멸 이상 | 빨강×1 + 파랑×1 + 노랑×1 | 빈 파티 슬롯 1칸당 주는 피해 4~8% 증가·받는 피해 4~8% 감소 (`EmptySlotBonus`) |
+| 794014 | Swift Reliquary | 불멸~우주 | 불멸 이상 | 빨강×1 + 파랑×3 | 몬스터 처치 시 전 파티원 이동속도 1% 증가(5초), 최대 30~50중첩(스테이지 종료 또는 5초 경과 시 전부 소멸) (`KillStackPartyMoveSpeed`) |
+| 794019 | Chain Reaction Reliquary | 불멸~우주 | 아르카나 이상 | 빨강×3 + 파랑×2 | 점화된 몬스터가 감전되면 폭발하여 반경 300 내 몬스터에 200% 화염 피해 (`IgniteShockExplosion`) |
+| 794021 | Vengeful Reliquary | 불멸~우주 | 불멸 이상 | 빨강×3 + 노랑×1 | 파티원 사망 시 생존 파티원의 피해 20~40% 증가(10초) (`AllyDeathAttackBuff`) |
+| 794023 | Executioner's Reliquary | 불멸~우주 | 아르카나 이상 | 빨강×3 + 보라×2 | HP 11~15% 이하의 일반 몬스터 즉사 (`ExecuteLowHpNormalMonster`) |
+| 794024 | Phoenix Reliquary | 불멸~우주 | 아르카나 이상 | 빨강×3 + 노랑×2 | 파티원 사망 시 HP 30~50%로 부활(스테이지당 1회) (`ReviveFallenAlly`) |
+| 794025 | Black Flame Reliquary | 불멸~우주 | 아르카나 이상 | 빨강×2 + 보라×3 | 화염 피해를 혼돈 피해로 전환 (`ElementConvertToChaos`) |
+| 794026 | Black Frost Reliquary | 불멸~우주 | 아르카나 이상 | 파랑×2 + 보라×3 | 냉기 피해를 혼돈 피해로 전환 (`ElementConvertToChaos`) |
+| 794027 | Black Lightning Reliquary | 불멸~우주 | 아르카나 이상 | 노랑×2 + 보라×3 | 번개 피해를 혼돈 피해로 전환 (`ElementConvertToChaos`) |
+| 794029 | Relentless Reliquary | 불멸~우주 | 아르카나 이상 | 파랑×4 | 재사용 대기시간 감소(+%) 10~20 (`StatValueUp`) |
+| 794030 | Mirror Reliquary | 불멸~우주 | 아르카나 이상 | 파랑×2 + 노랑×3 | 막아낸 피해의 300~500% 반사 (`BlockReflectDamage`) |
+| 794031 | Commander's Reliquary | 불멸~우주 | 아르카나 이상 | 빨강×3 + 노랑×2 | 스테이지 시작 시 무작위 파티원 1명이 리더가 되어 10~20% 커지고, 커진 비율만큼 최대 HP·피해 증가(파티 2명 이상일 때만) (`RandomLeaderBuff`) |
+| 794032 | Bitter Cold Reliquary | 불멸~우주 | 아르카나 이상 | 파랑×5 | 모든 냉기 피해가 냉각(Chill) 부여, 대신 화염 피해 50% 감소 (`ColdCausesChillFireDamageDown`) |
+| 794033 | Oath Reliquary | 불멸~우주 | 아르카나 이상 | 노랑×5 | 최대 HP를 넘는 흡혈·처치 회복량의 200~500%만큼 주변 몬스터에 번개 피해 (`OverhealLightningDamage`) |
+| 794035 | Companion's Reliquary | 불멸~우주 | 아르카나 이상 | 파랑×2 + 노랑×4 | 소환수가 소환자의 치명타 확률을 이어받아 치명타 가능 (`SummonUseOwnerCritChance`) |
+| 794036 | Corrupt Reliquary | 불멸~우주 | 아르카나 이상 | 보라×5 | 모든 혼돈 피해가 총 치명타 피해 수치의 20~40%만큼 증가, 대신 혼돈 피해는 치명타 불가 (`ChaosDamageCritConvert`) |
+| 794037 | Bulwark Reliquary | 불멸~우주 | 아르카나 이상 | 노랑×4 + 보라×2 | 전 파티원에게 레벨 3~5 수호의 축복(Blessing of Warding) 발동 (`ApplyBlessingLevel:40501`) |
+| 794040 | Swift Reliquary | 불멸~우주 | 아르카나 이상 | 빨강×2 + 파랑×4 | 몬스터 처치 시 전 파티원 이동속도 1% 증가(5초), 최대 60~100중첩(스테이지 종료 또는 5초 경과 시 전부 소멸) (`KillStackPartyMoveSpeed`) |
+| 794041 | Keen Reliquary | 불멸~우주 | 아르카나 이상 | 빨강×4 + 파랑×2 | 비치명타 피해를 준 몬스터에게 주는 다음 피해가 치명타가 아니면 치명타 판정 1회 추가 (`NonCritRerollCrit`) |
+| 794042 | Vengeful Reliquary | 불멸~우주 | 아르카나 이상 | 보라×4 + 노랑×2 | 파티원 사망 시 생존 파티원의 피해 50~100% 증가(10초) (`AllyDeathAttackBuff`) |
+| 795016 | Prism Reliquary | 아르카나~우주 | 아르카나 이상 | 빨강×1 + 파랑×1 + 노랑×1 + 보라×1 | 스테이지 진입 후 처음 준 원소 피해의 속성으로 고정: 해당 원소 피해 30~50% 증가, 다른 원소 피해는 불가 (`ElementLock`) |
+| 795034 | Condemnation Reliquary | 아르카나~우주 | 아르카나 이상 | 빨강×2 + 파랑×2 + 노랑×2 + 보라×2 | 주변 몬스터에 초당 30~70% 화염 피해 (`AuraFireDamagePerSecond`) |
+| 795038 | Might Reliquary | 아르카나~우주 | 아르카나 이상 | 빨강×4 + 노랑×1 | 전 파티원에게 레벨 3~5 힘의 축복(Blessing of Might) 발동 (`ApplyBlessingLevel:40201`) |
+| 795039 | Executioner's Reliquary | 아르카나~우주 | 아르카나 이상 | 빨강×3 + 보라×3 | HP 16~20% 이하의 일반 몬스터 즉사 (`ExecuteLowHpNormalMonster`) |
+| 795043 | Prism Reliquary | 아르카나~우주 | 아르카나 이상 | 빨강×2 + 파랑×2 + 노랑×1 + 보라×1 | 스테이지 진입 후 처음 준 원소 피해의 속성으로 고정: 해당 원소 피해 30~50% 증가, 다른 원소 피해는 불가 (`ElementLock`) |
+| 797044 | Vampire's Reliquary | 천상~우주 | 천상 이상 | 빨강×2 + 보라×5 | 흡혈 1.5~2배, 대신 초당 HP 재생·타격 시 회복·처치 시 회복 비활성(프리스트 치유 스킬은 예외) (`LifestealDoubleDisableOtherHeal`) |
+| 797045 | Pure Flame Reliquary | 천상~우주 | 천상 이상 | 빨강×7 | 모든 화염 피해가 점화 부여, 점화 피해 100% 증가 (`FireDamageAlwaysIgnite`) |
+| 797046 | Pure Frost Reliquary | 천상~우주 | 천상 이상 | 파랑×7 | HP 25~30% 이하의 빙결된 몬스터가 물리 피해를 받으면 즉사(보스는 기준치가 50%로 축소) (`FrozenPhysicalExecute`) |
+| 797047 | Pure Light Reliquary | 천상~우주 | 천상 이상 | 노랑×7 | 번개 피해가 치명타일 때 감전 부여, 감전된 적은 번개 피해 10~20% 추가로 받음 (`LightningCritShock`) |
+| 797048 | Pure Void Reliquary | 천상~우주 | 천상 이상 | 보라×7 | 모든 스킬이 가한 피해의 15~30%만큼 추가 혼돈 피해 (`SkillExtraChaosDamage`) |
+| 797049 | Forgotten King's Reliquary | 천상~우주 | 천상 이상 | 빨강×2 + 파랑×2 + 노랑×2 + 보라×2 | 빈 파티 슬롯 1칸당 주는 피해 9~18% 증가·받는 피해 9~18% 감소 (`EmptySlotBonus`) |
+| 797050 | Twinborn Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 파랑×4 | 점화된 적 대상 냉기 피해 25~50% 증가, 냉각된 적 대상 화염 피해 25~50% 증가 (`IgniteChillCrossDamage`) |
+| 797051 | Master's Reliquary | 천상~우주 | 천상 이상 | 빨강×2 + 파랑×2 + 노랑×2 + 보라×1 | 모든 스킬 레벨(+) 1~2 (`StatValueUp`) |
+| 797052 | Resonator Reliquary | 천상~우주 | 천상 이상 | 빨강×1 + 파랑×1 + 노랑×2 + 보라×2 | 장착한 다른 유물함의 공명 효과 수치 50% 증가 (`ResonanceValueUp`) |
+| 797053 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 파랑×2 + 노랑×4 | 기사(Knight)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
+| 797054 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 파랑×4 + 보라×2 | 레인저(Ranger)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
+| 797055 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 파랑×2 + 보라×4 | 소서러(Sorcerer)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
+| 797057 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 노랑×2 + 보라×4 | 헌터(Hunter)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
+| 797058 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 파랑×2 + 보라×4 | 슬레이어(Slayer)의 공격 스킬 재사용 대기시간 제거, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoCooldownMaxHpCost`) |
+| 797059 | Commander's Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 노랑×3 | 스테이지 시작 시 무작위 파티원 1명이 리더가 되어 30~50% 커지고, 커진 비율만큼 최대 HP·피해 증가(파티 2명 이상일 때만) (`RandomLeaderBuff`) |
+| 797060 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 파랑×4 + 노랑×2 | 기사(Knight)의 공격 스킬이 기본 공격 횟수 누적 없이 발동, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoBaseAttackCountMaxHpCost`) |
+| 797061 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 파랑×2 + 보라×4 | 레인저(Ranger)의 공격 스킬이 기본 공격 횟수 누적 없이 발동, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoBaseAttackCountMaxHpCost`) |
+| 797062 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 노랑×4 + 보라×2 | 헌터(Hunter)의 공격 스킬이 기본 공격 횟수 누적 없이 발동, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoBaseAttackCountMaxHpCost`) |
+| 797063 | Rampant Reliquary | 천상~우주 | 천상 이상 | 빨강×4 + 파랑×4 + 보라×2 | 슬레이어(Slayer)의 공격 스킬이 기본 공격 횟수 누적 없이 발동, 대신 스킬 사용마다 최대 HP의 10~50% 소모 (`NoBaseAttackCountMaxHpCost`) |
 
-- "Rampant" 계열은 영웅 전용이다(헌터·슬레이어용은 해당 DLC 영웅 보유 시에만 봉헌 풀에 들어감 — 봉헌 가중치 행에 영웅 키 501/601 조건이 붙어 있음). [확인: shunshu 봉헌 데이터]
+- "Rampant" 계열은 영웅 전용이다(헌터·슬레이어용은 해당 DLC 영웅 보유 시에만 기원 풀에 들어감 — 기원 가중치 행에 영웅 키 501/601 조건이 붙어 있음). [확인: shunshu 기원 데이터]
 - "Resonator"(공명기)는 다른 장착 유물함의 공명 수치를 50% 올린다 → 유물함 2개 장착을 전제한 메타 효과.
 
-### 3.5 봉헌(Offering) 결과 등급 확률 — v1.03.00
+### 3.5 기원(Offering) 결과 등급 확률 — v1.03.00
 
 - 레시피: 오염된 유물함(또는 오염된 유물) 1개 + 골드 10 → 무작위 유물함(유물) 1개. [추정: Steam 가이드가 "레시피 표에 10 gold"라고 기술, 단일 출처]
-- 결과는 **투입 등급 이상**에서만 나온다. 아래는 shunshu 봉헌 가중치(총합 약 1억)를 등급별로 합산한 백분율이다. [확인: 데이터 추출 DB 1곳 + Steam 가이드의 "같은 등급 또는 상위 등급" 서술 일치]
+- 같은 확률표와 기원 레시피 전반은 03 문서(큐브·제작) 9절에도 있다. 조율 비용표는 03 문서 10절과 동일 출처·동일 수치다.
+- 결과는 **투입 등급 이상**에서만 나온다. 아래는 shunshu 기원 가중치(총합 약 1억)를 등급별로 합산한 백분율이다. [확인: 데이터 제거 DB 1곳 + Steam 가이드의 "같은 등급 또는 상위 등급" 서술 일치]
 
 오염된 유물함 → 유물함 (DLC 영웅 전용 행 제외):
 
-| 투입 등급 ↓ / 결과 등급 → | Common | Uncommon | Rare | Legendary | Immortal | Arcana | Beyond | Celestial | Divine | Cosmic |
+| 투입 등급 ↓ / 결과 등급 → | 일반 | 고급 | 희귀 | 전설 | 불멸 | 아르카나 | 초월 | 천상 | 신성 | 우주 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Common | 64.4903% | 25.0053% | 7.5016% | 2.1432% | 0.6960% | 0.1402% | 0.0210% | 0.0021% | 0.0001% | 0.0000% |
-| Uncommon | – | 67.7724% | 23.0151% | 6.5754% | 2.1354% | 0.4302% | 0.0645% | 0.0066% | 0.0004% | 0.0000% |
-| Rare | – | – | 70.5159% | 21.0441% | 6.8342% | 1.3768% | 0.2065% | 0.0210% | 0.0013% | 0.0001% |
-| Legendary | – | – | – | 77.0065% | 18.6188% | 3.7510% | 0.5626% | 0.0573% | 0.0036% | 0.0002% |
-| Immortal | – | – | – | – | 80.0570% | 17.0993% | 2.5649% | 0.2613% | 0.0165% | 0.0009% |
-| Arcana | – | – | – | – | – | 84.4794% | 13.9992% | 1.4263% | 0.0903% | 0.0047% |
-| Beyond | – | – | – | – | – | – | 88.0510% | 11.2026% | 0.7091% | 0.0373% |
-| Celestial | – | – | – | – | – | – | – | 91.4526% | 8.1203% | 0.4271% |
-| Divine | – | – | – | – | – | – | – | – | 94.9248% | 5.0752% |
-| Cosmic | – | – | – | – | – | – | – | – | – | 100.0000% |
+| 일반 | 64.4903% | 25.0053% | 7.5016% | 2.1432% | 0.6960% | 0.1402% | 0.0210% | 0.0021% | 0.0001% | 0.0000% |
+| 고급 | – | 67.7724% | 23.0151% | 6.5754% | 2.1354% | 0.4302% | 0.0645% | 0.0066% | 0.0004% | 0.0000% |
+| 희귀 | – | – | 70.5159% | 21.0441% | 6.8342% | 1.3768% | 0.2065% | 0.0210% | 0.0013% | 0.0001% |
+| 전설 | – | – | – | 77.0065% | 18.6188% | 3.7510% | 0.5626% | 0.0573% | 0.0036% | 0.0002% |
+| 불멸 | – | – | – | – | 80.0570% | 17.0993% | 2.5649% | 0.2613% | 0.0165% | 0.0009% |
+| 아르카나 | – | – | – | – | – | 84.4794% | 13.9992% | 1.4263% | 0.0903% | 0.0047% |
+| 초월 | – | – | – | – | – | – | 88.0510% | 11.2026% | 0.7091% | 0.0373% |
+| 천상 | – | – | – | – | – | – | – | 91.4526% | 8.1203% | 0.4271% |
+| 신성 | – | – | – | – | – | – | – | – | 94.9248% | 5.0752% |
+| 우주 | – | – | – | – | – | – | – | – | – | 100.0000% |
 
 오염된 유물 → 유물:
 
-| 투입 등급 ↓ / 결과 등급 → | Common | Uncommon | Rare | Legendary | Immortal | Arcana | Beyond | Celestial | Divine | Cosmic |
+| 투입 등급 ↓ / 결과 등급 → | 일반 | 고급 | 희귀 | 전설 | 불멸 | 아르카나 | 초월 | 천상 | 신성 | 우주 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Common | 64.4765% | 25.0000% | 7.5000% | 2.1428% | 0.7142% | 0.1428% | 0.0214% | 0.0021% | 0.0001% | 0.0000% |
-| Uncommon | – | 67.7280% | 23.0000% | 6.5711% | 2.1901% | 0.4380% | 0.0657% | 0.0066% | 0.0004% | 0.0000% |
-| Rare | – | – | 70.3685% | 21.0000% | 6.9993% | 1.3999% | 0.2100% | 0.0210% | 0.0013% | 0.0001% |
-| Legendary | – | – | – | 76.5692% | 19.0000% | 3.8000% | 0.5700% | 0.0570% | 0.0036% | 0.0002% |
-| Immortal | – | – | – | – | 80.1780% | 17.0000% | 2.5500% | 0.2550% | 0.0161% | 0.0009% |
-| Arcana | – | – | – | – | – | 84.5067% | 14.0000% | 1.4000% | 0.0886% | 0.0047% |
-| Beyond | – | – | – | – | – | – | 88.2671% | 11.0000% | 0.6963% | 0.0366% |
-| Celestial | – | – | – | – | – | – | – | 91.5792% | 8.0000% | 0.4208% |
-| Divine | – | – | – | – | – | – | – | – | 95.0000% | 5.0000% |
-| Cosmic | – | – | – | – | – | – | – | – | – | 100.0000% |
+| 일반 | 64.4765% | 25.0000% | 7.5000% | 2.1428% | 0.7142% | 0.1428% | 0.0214% | 0.0021% | 0.0001% | 0.0000% |
+| 고급 | – | 67.7280% | 23.0000% | 6.5711% | 2.1901% | 0.4380% | 0.0657% | 0.0066% | 0.0004% | 0.0000% |
+| 희귀 | – | – | 70.3685% | 21.0000% | 6.9993% | 1.3999% | 0.2100% | 0.0210% | 0.0013% | 0.0001% |
+| 전설 | – | – | – | 76.5692% | 19.0000% | 3.8000% | 0.5700% | 0.0570% | 0.0036% | 0.0002% |
+| 불멸 | – | – | – | – | 80.1780% | 17.0000% | 2.5500% | 0.2550% | 0.0161% | 0.0009% |
+| 아르카나 | – | – | – | – | – | 84.5067% | 14.0000% | 1.4000% | 0.0886% | 0.0047% |
+| 초월 | – | – | – | – | – | – | 88.2671% | 11.0000% | 0.6963% | 0.0366% |
+| 천상 | – | – | – | – | – | – | – | 91.5792% | 8.0000% | 0.4208% |
+| 신성 | – | – | – | – | – | – | – | – | 95.0000% | 5.0000% |
+| 우주 | – | – | – | – | – | – | – | – | – | 100.0000% |
 
 - 유물의 색별 가중치(같은 등급 안): 빨강 합 ≈ 노랑 합 ≈ 파랑 합 ≈ 보라 합(각 약 15.5%p 비중), 흰색 합은 그 1/6. 즉 색은 4색이 거의 균등하고 흰색만 희귀하다. [확인: 가중치 계산]
-- 노랑 유물 "Golden Relic - Broken Chain"은 데이터에는 있으나 봉헌 결과 풀에 없다(획득 경로 [미확인]).
-- 드롭처 요약(shunshu 드롭 테이블 분석 [추정]): 오염된 유물은 역병 지대 일반 상자, 오염된 유물함은 스테이지 상자에서 나오고, 출현 빈도는 난이도보다 **역병 강도**에 좌우된다(강도 16~20이 1~5의 약 2배). 난이도는 주로 재료의 등급을 바꾼다. Torment 오염된 액트 보스 상자는 대체로 Immortal 이상을 준다. 상자별 절대 확률은 본 조사 범위 밖(드롭/경제 문서 참조).
+- 노랑 유물 "Golden Relic - Broken Chain"은 데이터에는 있으나 기원 결과 풀에 없다(획득 경로 [미확인]).
+- 드롭처 요약(shunshu 드롭 테이블 분석 [추정]): 오염된 유물은 역병지대 일반 상자, 오염된 유물함은 스테이지 상자에서 나오고, 출현 빈도는 난이도보다 **역병 강도**에 좌우된다(강도 16~20이 1~5의 약 2배). 난이도는 주로 재료의 등급을 바꾼다. Torment 오염된 액트 보스 상자는 대체로 불멸 이상을 준다. 상자별 절대 확률은 본 조사 범위 밖(드롭/경제 문서 참조).
 
 ### 3.6 조율(Attunement) 비용 — v1.03.00
 
-- n번째 시도 비용 = 첫 비용 + 회당 증가 × min(이전 시도 횟수, 19). 즉 20번째 시도부터 상한 고정. 시도 횟수는 **아이템 개체에 누적**된다. [확인] shunshu `relicAttunement`(base/inc/max=19), tbhindex 표(검색 요약: Legendary 유물함 2,700 / +3,240 / 상한 64,260 등 5개 등급 수치 일치), Steam 가이드의 모형 C(m)=b+d×min(m,19) 일치
+- n번째 시도 비용 = 첫 비용 + 회당 증가 × min(이전 시도 횟수, 19). 즉 20번째 시도부터 상한 고정. 시도 횟수는 **아이템 개체에 누적**된다. [확인] shunshu `relicAttunement`(base/inc/max=19), tbhindex 표(검색 요약: 전설 유물함 2,700 / +3,240 / 상한 64,260 등 5개 등급 수치 일치), Steam 가이드의 모형 C(m)=b+d×min(m,19) 일치
 - 유물의 비용은 같은 등급 유물함의 정확히 절반.
 
 | 등급 | 유물함: 첫 비용 | 유물함: 회당 증가 | 유물함: 상한(20회차~) | 유물: 첫 비용 | 유물: 회당 증가 | 유물: 상한(20회차~) |
 |---|---|---|---|---|---|---|
-| Common | 100 | +120 | 2,380 | 50 | +60 | 1,190 |
-| Uncommon | 300 | +360 | 7,140 | 150 | +180 | 3,570 |
-| Rare | 900 | +1,080 | 21,420 | 450 | +540 | 10,710 |
-| Legendary | 2,700 | +3,240 | 64,260 | 1,350 | +1,620 | 32,130 |
-| Immortal | 9,450 | +11,340 | 224,910 | 4,725 | +5,670 | 112,455 |
-| Arcana | 35,900 | +43,080 | 854,420 | 17,950 | +21,540 | 427,210 |
-| Beyond | 144,000 | +172,800 | 3,427,200 | 72,000 | +86,400 | 1,713,600 |
-| Celestial | 603,000 | +723,600 | 14,351,400 | 301,500 | +361,800 | 7,175,700 |
-| Divine | 2,650,000 | +3,180,000 | 63,070,000 | 1,325,000 | +1,590,000 | 31,535,000 |
-| Cosmic | 12,200,000 | +14,640,000 | 290,360,000 | 6,100,000 | +7,320,000 | 145,180,000 |
+| 일반 | 100 | +120 | 2,380 | 50 | +60 | 1,190 |
+| 고급 | 300 | +360 | 7,140 | 150 | +180 | 3,570 |
+| 희귀 | 900 | +1,080 | 21,420 | 450 | +540 | 10,710 |
+| 전설 | 2,700 | +3,240 | 64,260 | 1,350 | +1,620 | 32,130 |
+| 불멸 | 9,450 | +11,340 | 224,910 | 4,725 | +5,670 | 112,455 |
+| 아르카나 | 35,900 | +43,080 | 854,420 | 17,950 | +21,540 | 427,210 |
+| 초월 | 144,000 | +172,800 | 3,427,200 | 72,000 | +86,400 | 1,713,600 |
+| 천상 | 603,000 | +723,600 | 14,351,400 | 301,500 | +361,800 | 7,175,700 |
+| 신성 | 2,650,000 | +3,180,000 | 63,070,000 | 1,325,000 | +1,590,000 | 31,535,000 |
+| 우주 | 12,200,000 | +14,640,000 | 290,360,000 | 6,100,000 | +7,320,000 | 145,180,000 |
 
 - 유물함 조율: 슬롯 색 전체 재추첨, 색은 균등 확률(공식). 색 가짓수를 5로 본 팬 계산(슬롯 1칸이 특정 색일 확률 1/5)은 [추정] — 슬롯 색에 흰색이 포함되는지 [미확인].
-- 유물 조율: 고유 능력치 수치만 재추첨(종류·색·등급 불변).
+- 유물 조율: 고정 속성 수치만 재추첨(종류·색·등급 불변).
 - 업적 "Master of Attunement": 같은 유물/유물함을 10회 조율.
 
 ### 3.7 1.3.x 핫픽스에서 바뀐 유물 규칙 [확인 — 1.3.2 패치노트(2026-10-27)]
@@ -719,14 +724,14 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 
 ## 4. 파티(그룹) 공통 보너스
 
-- 1.3.0 관련 기사(jeu.video 등)의 "group bonus / bonus de groupe"는 **별도의 시스템 이름이 아니다.** 공식 패치노트의 문장 "파티원의 전반적인 능력을 강화하는 유물 시스템 추가", "유물함/유물의 고유 능력치 효과는 모든 파티원에게 적용", "공명 효과는 모든 파티원에게 특수 능력치 부여"를 옮긴 표현이다. [확인] 1.3.0 패치노트 원문 대조(jeu.video 기사 자체는 접근 차단으로 원문 미열람, 검색 요약만)
+- 1.3.0 관련 기사(jeu.video 등)의 "group bonus / bonus de groupe"는 **별도의 시스템 이름이 아니다.** 공식 패치노트의 문장 "파티원의 전반적인 능력을 강화하는 유물 시스템 추가", "유물함/유물의 고정 속성 효과는 모든 파티원에게 적용", "공명 효과는 모든 파티원에게 특수 능력치 부여"를 옮긴 표현이다. [확인] 1.3.0 패치노트 원문 대조(jeu.video 기사 자체는 접근 차단으로 원문 미열람, 검색 요약만)
 - 따라서 "파티 전체에 적용되는 보너스 체계"는 다음 4층이다.
 
 | 층 | 적용 대상 | 내용 | 도입 |
 |---|---|---|---|
 | 룬 | 계정의 모든 영웅 | 전 영웅 공격력/방어력/공격속도/이동속도, 파밍 보너스, 슬롯·편의 해금 | 출시 |
 | 펫 보유 효과 | 계정 | 경험치·골드·상자 드롭 계수 | 출시 |
-| 유물함 고유 능력치 + 유물 고유 능력치 | 현재 파티원 전원 | 공격력%, 최대 HP%, 치명타 피해, 공격·시전 속도, 재사용 대기시간 감소, 저항, 피해 감소, 이동속도 등 | 1.3.0 |
+| 유물함 고정 속성 + 유물 고정 속성 | 현재 파티원 전원 | 공격력%, 최대 HP%, 치명타 피해, 공격·시전 속도, 재사용 대기시간 감소, 저항, 피해 감소, 이동속도 등 | 1.3.0 |
 | 유물함 공명 효과 | 현재 파티원 전원(일부는 특정 영웅 전용) | 조건부 특수 규칙(즉사, 반사, 원소 전환, 축복 자동 발동 등) | 1.3.0 |
 
 - 파티 구성 자체에 따른 시너지 보너스(직업 조합 보너스, 진형 보너스 등)는 찾지 못했다. [미확인] 다만 유물함 공명 중 "빈 파티 슬롯 1칸당 피해 증가/받는 피해 감소"(Forgotten King's), "무작위 리더 강화(파티 2명 이상)"(Commander's)처럼 파티 인원을 조건으로 삼는 효과는 있다. [확인]
@@ -736,7 +741,7 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 
 ## 5. 업적 / 도감 / 칭호 / 마일스톤
 
-- **Steam 업적 80개**(출시 시 56개 + 1.3.0에서 24개 추가: 역병 지대 15, 부식 1, 유물 8). [확인] Steam 업적 페이지·API, 1.3.0 패치노트("Added 24 new Plaguelands achievements"), probonk "Achievements 56 goals"(1.3.0 이전 스냅샷)
+- **Steam 업적 80개**(출시 시 56개 + 1.3.0에서 24개 추가: 역병지대 15, 부식 1, 유물 8). [확인] Steam 업적 페이지·API, 1.3.0 패치노트("Added 24 new Plaguelands achievements"), probonk "Achievements 56 goals"(1.3.0 이전 스냅샷)
 - **업적 달성 보상(골드·스탯·아이템)은 확인되지 않았다.** 공식 패치노트 어디에도 업적 보상 언급이 없고, 데이터 사이트의 45개 테이블에 업적 보상 테이블이 없다. 영구 보너스를 주는 시스템이 아니라 Steam 업적으로만 기능하는 것으로 보인다. [추정: 부재 증거]
 - 도감(컬렉션), 칭호 시스템: 찾지 못함. [미확인] (데이터 테이블 목록에 해당 테이블 없음)
 - 통계(Statistics) UI: 1.02.00에서 추가. 각종 플레이 기록 열람용이며 보상 언급 없음. [확인]
@@ -756,49 +761,49 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 | 102001 | Package Delivered~ | 일반 상자 10개 열기 | 100.0% | 출시(1.00.x) |
 | 102002 | A Gift from the Boss | 스테이지 보스 상자 10개 열기 | 100.0% | 출시(1.00.x) |
 | 102003 | The Big Boss's Treasure | 액트 보스 상자 10개 열기 | 80.6% | 출시(1.00.x) |
-| 103001 | Starlit Gear | Arcana 등급 장비 최초 획득 | 81.0% | 출시(1.00.x) |
-| 103002 | Gear Beyond Limits | Beyond 등급 장비 최초 획득 | 71.6% | 출시(1.00.x) |
-| 103003 | Heaven-Sent Gear | Celestial 등급 장비 최초 획득 | 55.3% | 출시(1.00.x) |
-| 103004 | Blessed by the Divine | Divine 등급 장비 최초 획득 | 41.1% | 출시(1.00.x) |
-| 103005 | Chosen by the Cosmos | Cosmic 등급 장비 최초 획득 | 36.1% | 출시(1.00.x) |
+| 103001 | Starlit Gear | 아르카나 등급 장비 최초 획득 | 81.0% | 출시(1.00.x) |
+| 103002 | Gear Beyond Limits | 초월 등급 장비 최초 획득 | 71.6% | 출시(1.00.x) |
+| 103003 | Heaven-Sent Gear | 천상 등급 장비 최초 획득 | 55.3% | 출시(1.00.x) |
+| 103004 | Blessed by the Divine | 신성 등급 장비 최초 획득 | 41.1% | 출시(1.00.x) |
+| 103005 | Chosen by the Cosmos | 우주 등급 장비 최초 획득 | 36.1% | 출시(1.00.x) |
 | 104001 | First Paycheck | 골드 1,000 획득 | 81.7% | 출시(1.00.x) |
 | 104002 | Millionaire Dreams | 골드 1,000,000 획득 | 61.8% | 출시(1.00.x) |
 | 104003 | Overflowing Vault | 골드 100,000,000 획득 | 42.6% | 출시(1.00.x) |
-| 105001 | Beak Mask On | 역병 지대 스테이지 최초 클리어 | 8.5% | 1.3.0 |
-| 105002 | Apprentice Hunter (Nightmare) | Nightmare 역병 지대를 역병 강도 5로 클리어 | 3.0% | 1.3.0 |
-| 105003 | Plague Hunter (Nightmare) | Nightmare 역병 지대를 역병 강도 10로 클리어 | 2.2% | 1.3.0 |
-| 105004 | Plague Slayer (Nightmare) | Nightmare 역병 지대를 역병 강도 15로 클리어 | 1.9% | 1.3.0 |
-| 105005 | Bane of the Plague (Nightmare) | Nightmare 역병 지대를 역병 강도 20로 클리어 | 1.4% | 1.3.0 |
-| 105006 | Apprentice Hunter (Hell) | Hell 역병 지대를 역병 강도 5로 클리어 | 4.0% | 1.3.0 |
-| 105007 | Plague Hunter (Hell) | Hell 역병 지대를 역병 강도 10로 클리어 | 2.9% | 1.3.0 |
-| 105008 | Plague Slayer (Hell) | Hell 역병 지대를 역병 강도 15로 클리어 | 1.6% | 1.3.0 |
-| 105009 | Bane of the Plague (Hell) | Hell 역병 지대를 역병 강도 20로 클리어 | 1.0% | 1.3.0 |
-| 105010 | Apprentice Hunter (Torment) | Torment 역병 지대를 역병 강도 5로 클리어 | 3.0% | 1.3.0 |
-| 105011 | Plague Hunter (Torment) | Torment 역병 지대를 역병 강도 10로 클리어 | 1.6% | 1.3.0 |
-| 105012 | Plague Slayer (Torment) | Torment 역병 지대를 역병 강도 15로 클리어 | 1.1% | 1.3.0 |
-| 105013 | Bane of the Plague (Torment) | Torment 역병 지대를 역병 강도 20로 클리어 | 0.6% | 1.3.0 |
+| 105001 | Beak Mask On | 역병지대 스테이지 최초 클리어 | 8.5% | 1.3.0 |
+| 105002 | Apprentice Hunter (Nightmare) | Nightmare 역병지대를 역병 강도 5에서 클리어 | 3.0% | 1.3.0 |
+| 105003 | Plague Hunter (Nightmare) | Nightmare 역병지대를 역병 강도 10에서 클리어 | 2.2% | 1.3.0 |
+| 105004 | Plague Slayer (Nightmare) | Nightmare 역병지대를 역병 강도 15에서 클리어 | 1.9% | 1.3.0 |
+| 105005 | Bane of the Plague (Nightmare) | Nightmare 역병지대를 역병 강도 20에서 클리어 | 1.4% | 1.3.0 |
+| 105006 | Apprentice Hunter (Hell) | Hell 역병지대를 역병 강도 5에서 클리어 | 4.0% | 1.3.0 |
+| 105007 | Plague Hunter (Hell) | Hell 역병지대를 역병 강도 10에서 클리어 | 2.9% | 1.3.0 |
+| 105008 | Plague Slayer (Hell) | Hell 역병지대를 역병 강도 15에서 클리어 | 1.6% | 1.3.0 |
+| 105009 | Bane of the Plague (Hell) | Hell 역병지대를 역병 강도 20에서 클리어 | 1.0% | 1.3.0 |
+| 105010 | Apprentice Hunter (Torment) | Torment 역병지대를 역병 강도 5에서 클리어 | 3.0% | 1.3.0 |
+| 105011 | Plague Hunter (Torment) | Torment 역병지대를 역병 강도 10에서 클리어 | 1.6% | 1.3.0 |
+| 105012 | Plague Slayer (Torment) | Torment 역병지대를 역병 강도 15에서 클리어 | 1.1% | 1.3.0 |
+| 105013 | Bane of the Plague (Torment) | Torment 역병지대를 역병 강도 20에서 클리어 | 0.6% | 1.3.0 |
 | 105014 | Source Eliminated | 오염된 액트 보스 처치 | 0.7% | 1.3.0 |
-| 105015 | Plague Doctor | 역병 지대에서 몬스터 10,000마리 처치 | 5.5% | 1.3.0 |
+| 105015 | Plague Doctor | 역병지대에서 몬스터 10,000마리 처치 | 5.5% | 1.3.0 |
 | 110001 | Alchemy 101 | 연금으로 골드 1,000 획득 | 61.6% | 출시(1.00.x) |
 | 110002 | The Philosopher's Stone | 연금으로 골드 1,000,000 획득 | 40.3% | 출시(1.00.x) |
-| 111001 | Tasted the Power of Synthesis | Uncommon 등급 아이템 합성 최초 성공 | 100.0% | 출시(1.00.x) |
-| 111002 | Hey, Not Bad! | Rare 등급 아이템 합성 최초 성공 | 93.6% | 출시(1.00.x) |
-| 111003 | Legends Are Made, Not Born | Legendary 등급 아이템 합성 최초 성공 | 79.1% | 출시(1.00.x) |
-| 111004 | Recipe for Immortality | Immortal 등급 아이템 합성 최초 성공 | 61.9% | 출시(1.00.x) |
+| 111001 | Tasted the Power of Synthesis | 고급 등급 아이템 합성 최초 성공 | 100.0% | 출시(1.00.x) |
+| 111002 | Hey, Not Bad! | 희귀 등급 아이템 합성 최초 성공 | 93.6% | 출시(1.00.x) |
+| 111003 | Legends Are Made, Not Born | 전설 등급 아이템 합성 최초 성공 | 79.1% | 출시(1.00.x) |
+| 111004 | Recipe for Immortality | 불멸 등급 아이템 합성 최초 성공 | 61.9% | 출시(1.00.x) |
 | 112001 | A Decorative Awakening | 1티어 이상 장식 옵션 최초 적용 | 68.2% | 출시(1.00.x) |
 | 112002 | Decoration is an Art | 5티어 이상 장식 옵션 최초 적용 | 42.5% | 출시(1.00.x) |
-| 113001 | Baby Steps in Engraving | 1티어 이상 각인 옵션 최초 적용 | 50.4% | 출시(1.00.x) |
-| 113002 | Outshining Jewels | 5티어 이상 각인 옵션 최초 적용 | 35.0% | 출시(1.00.x) |
-| 114001 | Let's Try Inscribing | 1티어 이상 명문 옵션 최초 적용 | 27.0% | 출시(1.00.x) |
-| 114002 | Etched into the Soul | 5티어 이상 명문 옵션 최초 적용 | 16.5% | 출시(1.00.x) |
-| 115001 | First Wish | 봉헌 최초 성공 | 45.7% | 출시(1.00.x) |
-| 116001 | Accessory Workshop: OPEN! | Common 이상 장신구 제작 최초 성공 | 60.0% | 출시(1.00.x) |
-| 116002 | The Immortal Artisan | Immortal 이상 장신구 제작 최초 성공 | 46.7% | 출시(1.00.x) |
-| 117001 | Essence Extracted | 추출 최초 성공 | 45.4% | 출시(1.00.x) |
+| 113001 | Baby Steps in Engraving | 1티어 이상 세공 옵션 최초 적용 | 50.4% | 출시(1.00.x) |
+| 113002 | Outshining Jewels | 5티어 이상 세공 옵션 최초 적용 | 35.0% | 출시(1.00.x) |
+| 114001 | Let's Try Inscribing | 1티어 이상 각인 옵션 최초 적용 | 27.0% | 출시(1.00.x) |
+| 114002 | Etched into the Soul | 5티어 이상 각인 옵션 최초 적용 | 16.5% | 출시(1.00.x) |
+| 115001 | First Wish | 기원 최초 성공 | 45.7% | 출시(1.00.x) |
+| 116001 | Accessory Workshop: OPEN! | 일반 이상 장신구 제작 최초 성공 | 60.0% | 출시(1.00.x) |
+| 116002 | The Immortal Artisan | 불멸 이상 장신구 제작 최초 성공 | 46.7% | 출시(1.00.x) |
+| 117001 | Essence Extracted | 제거 최초 성공 | 45.4% | 출시(1.00.x) |
 | 118001 | Embrace the Blight | 부식(Corrosion) 최초 수행 | 5.2% | 1.3.0 |
 | 119001 | Horroric Cube | 큐브 레벨 10 달성 | 65.5% | 출시(1.00.x) |
 | 119002 | Decubed Cain | 큐브 레벨 50 달성 | 39.3% | 출시(1.00.x) |
-| 120001 | Rookie Merchant | 무역선에 아이템 최초 등록 | 69.6% | 출시(1.00.x) |
+| 120001 | Rookie Merchant | 교역선에 아이템 최초 등록 | 69.6% | 출시(1.00.x) |
 | 121001 | Friend of the Night | 박쥐 펫 해금 | 85.4% | 출시(1.00.x) |
 | 122001 | Hero's First Awakening | 영웅 레벨 10 최초 달성 | 100.0% | 출시(1.00.x) |
 | 122002 | Still Warming Up | 영웅 레벨 20 최초 달성 | 85.4% | 출시(1.00.x) |
@@ -808,7 +813,7 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 | 122006 | Almost There | 영웅 레벨 70 최초 달성 | 44.4% | 출시(1.00.x) |
 | 122007 | Legend of the Taskbar | 영웅 레벨 80 최초 달성 | 39.1% | 출시(1.00.x) |
 | 123001 | The Sacred Calling | 프리스트 영웅 해금 | 70.6% | 출시(1.00.x) |
-| 124001 | Seal Broken | 오염된 유물함 봉헌으로 유물함 최초 획득 | 3.8% | 1.3.0 |
+| 124001 | Seal Broken | 오염된 유물함 기원으로 유물함 최초 획득 | 3.8% | 1.3.0 |
 | 124002 | Awaken the Relic | 유물함에 유물 최초 장착 | 3.8% | 1.3.0 |
 | 124003 | First Resonance | 공명 효과 최초 발동 | 1.7% | 1.3.0 |
 | 124004 | Double Resonance | 공명 효과 2개 동시 발동 | 1.0% | 1.3.0 |
@@ -819,8 +824,8 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 | 131001 | Heroes Never Walk Alone | 영웅 4명을 레벨 50 이상으로 육성 | 18.2% | 출시(1.00.x) |
 | 131002 | Solo Shift in Hell | Hell 3-10 솔로 클리어 | 11.0% | 출시(1.00.x) |
 | 131003 | Two's Company | Torment 3-10을 2인 파티로 클리어 | 8.5% | 출시(1.00.x) |
-| 131004 | Obsession? No, Dedication. | 같은 아이템에 명문 100회 시도 | 0.5% | 출시(1.00.x) |
-| 131005 | The Perfectionist | 장착 장비 전부의 장식/각인/명문 완성(2/2/2 슬롯 아이템 기준) | 0.5% | 출시(1.00.x) |
+| 131004 | Obsession? No, Dedication. | 같은 아이템에 각인 100회 시도 | 0.5% | 출시(1.00.x) |
+| 131005 | The Perfectionist | 장착 장비 전부의 장식/세공/각인 완성(2/2/2 슬롯 아이템 기준) | 0.5% | 출시(1.00.x) |
 | 131006 | In the Blink of an Eye | 아무 스테이지나 10초 이내 클리어 | 47.5% | 출시(1.00.x) |
 | 131007 | ...Wait, I'm the Only One Left? | 3인 파티에서 2명이 죽은 상태로 Normal 3-10 액트 보스 클리어 | 5.8% | 출시(1.00.x) |
 | 131008 | Like a Ghost | 피격 없이 Nightmare 3-10 액트 보스 클리어 | 17.2% | 출시(1.00.x) |
@@ -833,11 +838,11 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 |---|---|---|---|
 | **프레스티지/환생** | – | **없음.** taskbarhero.wiki /mechanics: "레벨은 1~100 고정 테이블, 프레스티지·환생 시스템 없음". 공식 공지에도 언급 없음 | [확인: 데이터 기반 사이트 진술 + 공식 부재] |
 | 계정 레벨 | – | 별도 계정 레벨 없음(영웅 레벨과 큐브 레벨뿐) | [추정: 테이블 목록에 없음] |
-| **큐브 레벨** | 계정 | 1~100, 레벨별 필요 경험치 테이블(1레벨 15 → 99레벨 10,511,250). 아이템을 큐브 레시피로 소모해 경험치 획득. 레시피·등급 해금 관문(예: Immortal 합성 = 큐브 10, Celestial 합성 = 큐브 50, 봉헌 = 큐브 20). 연금/부식에 넣을 수 있는 아이템 레벨 ≤ 큐브 레벨+21(1.02.00~). 업적: 큐브 10, 50 | [확인] `/data/t/cube_levels.json`, 1.02.00 패치노트. 상세는 제작 문서 |
-| 영웅 레벨 | 영웅별 | 1~100 테이블(100레벨 필요 경험치 1,997,771,834). 업적은 80까지. "최대 레벨 상향"이 11월 예고됨 → 현재 실제 상한은 영웅 문서 참조 | [확인: 테이블] |
+| **큐브 레벨** | 계정 | 1~100, 레벨별 필요 경험치 테이블(1레벨 15 → 99레벨 10,511,250). 아이템을 큐브 레시피로 소모해 경험치 획득. 레시피·등급 해금 관문(예: 불멸 합성 = 큐브 10, 천상 합성 = 큐브 50, 기원 = 큐브 20). 연금/부식에 넣을 수 있는 아이템 레벨 ≤ 큐브 레벨+21(1.02.00~). 업적: 큐브 10, 50 | [확인] `/data/t/cube_levels.json`, 1.02.00 패치노트. 상세는 제작 문서 |
+| 영웅 레벨 | 영웅별 | 레벨업 테이블 100행(100레벨 행의 필요 경험치 1,997,771,834). 최대 레벨·성장 규칙은 01 문서(영웅) 참조. 업적은 레벨 80까지. "최대 레벨 상향"이 11월 예고됨 | [확인: 테이블] |
 | 영웅 특성(Attribute) 포인트 | 영웅별 | 영웅당 패시브/액티브 노드 묶음 8단(투자 포인트 0/10/…/70에서 다음 단 해금). 계정 공통 아님 | [확인] `/data/t/attributes.json`(132행), `attribute_groups.json`. 상세는 영웅 문서 |
 | 영웅 슬롯·스킬 슬롯 | 계정 | 룬으로 해금(파티 최대 3인, 스킬 슬롯 +1) | [확인] 1절 |
-| 인벤토리·창고·상자 보관량 | 계정 | 룬(인벤토리 +84, 창고 페이지 +3, 상자 보관) + DLC(Extra Stash 3탭 $2.99, Material Stash, Trade Ship DLC의 추가 무역선 슬롯). 인벤토리/창고/보관함 칸별 해금 비용 테이블 존재 | [확인] 공식 공지, `/data/t/inventory.json` 등 |
+| 인벤토리·창고·상자 보관량 | 계정 | 룬(인벤토리 +84, 창고 페이지 +3, 상자 보관) + DLC(Extra Stash 3탭 $2.99, Material Stash, Trade Ship DLC의 추가 교역선 슬롯). 인벤토리/창고/보관함 칸별 해금 비용 테이블 존재 | [확인] 공식 공지, `/data/t/inventory.json` 등 |
 | 스킨/외형 | 영웅별 | 1.02.00 추가. 일러스트·스프라이트·애니메이션만 변경, 능력치 언급 없음 | [확인] 패치노트 |
 | 별자리·유산·각성 등 기타 트리 | – | 찾지 못함 | [미확인] |
 | 시즌 | – | Dev Note #1(2026-08-19)이 "시즌 1 업데이트"를 예고. 내용·초기화 여부 | [미확인] |
@@ -890,10 +895,10 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 | 2026-04-30 | 0.01.04 | "펫은 배치하지 않아도 보유 효과 적용" 안내 추가, 스테이지 보스 골드 룬 미적용 수정, 룬 보너스가 새 캐릭터에 미적용되던 문제 수정, 연금 골드 룬 표시 수정 | 〃 |
 | 2026-05-02 | 0.01.05 | 웨이브 수 감소 룬 보유 시 액트 보스 웨이브가 2번 나오던 문제 수정 | 〃 |
 | 2026-05-27 | **1.00.01 정식 출시** | 룬 197노드, 펫 8종(무료 5 + Supporter Pack 3), 업적 56개 | Steam 뉴스, DB |
-| 2026-05-28 ~ 07-02 | 1.00.02 ~ 1.00.22 | 업적 미달성 버그 수정 다수(1-1 클리어, Arcana 획득, 무역선), 룬 UI 버그 수정. 규칙 변경 없음 | 〃 |
+| 2026-05-28 ~ 07-02 | 1.00.02 ~ 1.00.22 | 업적 미달성 버그 수정 다수(1-1 클리어, 아르카나 획득, 교역선), 룬 UI 버그 수정. 규칙 변경 없음 | 〃 |
 | 2026-07-22 | 1.01.00 | 밸런스 패치(영웅 패시브·몬스터·방어력 상한). 룬/펫 변경 없음 | 〃 |
 | 2026-09-08 | **1.02.00 Plaguelands** | 룬 노드 44개 추가(역병 27 + 기타 17), 룬 UI 최대 축소 배율 확대, 보이지 않던 액트 보스 상자 보관 노드 수정, 통계 UI, 외형 시스템 | 〃 |
-| 2026-09-14 | 1.02.03 | 역병 지대 일반 상자/스테이지 보스 상자 드롭 확률 룬 노드 각 1개 추가 | 〃 |
+| 2026-09-14 | 1.02.03 | 역병지대 일반 상자/스테이지 보스 상자 드롭 확률 룬 노드 각 1개 추가 | 〃 |
 | 2026-10-22 | **1.3.0 Halloween & Relic** | 유물 시스템(유물함·유물·공명), 큐브 조율 레시피, 할로윈 펫 2종, 업적 24개, 오프라인 경험치 룬 3개·액트 보스 경험치 룬 2개 추가, 액트 보스 경험치 룬 1개 +2,000→+10,000/레벨 | 〃 |
 | 2026-10-26 | 1.3.1 | UI 핫픽스(규칙 변경 없음) | 〃 |
 | 2026-10-27 | 1.3.2 | 유물 혼돈 저항 페널티 예외 수정, 유물 소수점 표시 수정, 최대 레벨 초과 룬 고정 | 〃 |
@@ -907,11 +912,14 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 |---|---|---|---|---|
 | Steam 공식 공지(뉴스 API, 117건 전량) | https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=3678970&count=200&maxlength=0 | 2025-10-14 ~ 2026-11-12 | **최상(공식)** | 규칙은 서술형, 수치표는 거의 없음 |
 | 〃 미러(읽기 편함) | https://taskbarhero.wiki/news/halloween-relic-update-ver-1-3-0 외 | 최근 30건 | 최상 | 원문 그대로 |
+| Steam 공식 공지(한국어 본문) | https://store.steampowered.com/events/ajaxgetpartnerevent?appid=3678970&event_gid=698779328450661923&l=koreana (1.3.0) | 2026-10-22 | 최상 | 공식 한국어 용어 확인용 |
 | Steam 업적 | https://steamcommunity.com/stats/3678970/achievements/ , https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=3678970 | 2026-11-21 | 최상 | 80개 |
-| taskbarhero.wiki (TBH Wiki) | https://taskbarhero.wiki/runes , /pets , /mechanics , /database ; 원시 JSON `/data/rune_tree.json`, `/data/runes.json`, `/data/t/<table>.json` | **v1.00.17** (사이트 명시) | 높음(게임 파일 추출 45개 테이블) — **단 구버전** | 역병·유물 없음. taskbarhero.top은 같은 사이트의 복제 |
-| flex.shunshu-labo.org TBH DBAPP | https://flex.shunshu-labo.org/en/tbh/ ; 원시 JSON `/wp-content/themes/shunshu/tbh/data/tbh-data.json` | **v1.03.00** (2026-10-23 갱신) | 높음(유물·봉헌·조율 전량) | 룬은 스탯별 집계만 |
+| taskbarhero.wiki (TBH Wiki) | https://taskbarhero.wiki/runes , /pets , /mechanics , /database ; 원시 JSON `/data/rune_tree.json`, `/data/runes.json`, `/data/t/<table>.json` | **v1.00.17** (사이트 명시) | 높음(게임 파일 제거 45개 테이블) — **단 구버전** | 역병·유물 없음. taskbarhero.top은 같은 사이트의 복제 |
+| flex.shunshu-labo.org TBH DBAPP | https://flex.shunshu-labo.org/en/tbh/ ; 원시 JSON `/wp-content/themes/shunshu/tbh/data/tbh-data.json` | **v1.03.00** (2026-10-23 갱신) | 높음(유물·기원·조율 전량) | 룬은 스탯별 집계만 |
 | flex.shunshu-labo.org 가이드 | https://flex.shunshu-labo.org/en/task-bar-hero/2616/ , /2624/ | 2026-10-22 | 중상 | 유물함 2개 장착, 해금 조건 |
 | Steam 가이드 "Killdozer's TBH Encyclopedia" | https://steamcommunity.com/sharedfiles/filedetails/?id=3809950323 | 1.3.0 이후 | 중상 | 유물/조율 서술이 DB와 일치. Rune Tree·Achievements 절은 "COMING SOON" |
+| Steam 가이드 "Task Bar Hero 101" | https://steamcommunity.com/sharedfiles/filedetails/?id=3734611647 | 2026-06-09 갱신(1.00.x) | 중 | 룬 트리 방위별 구성, 펫 배치는 외형용, 슬롯 룬 가격 150,000/50,000 |
+| Steam 토론 | https://steamcommunity.com/app/3678970/discussions/search/?q=reset+runes , https://steamcommunity.com/app/3678970/discussions/0/573804438794626972/ | 2026-06 ~ 11 | 낮음(이용자 경험담) | 룬 초기화 요청 글, 유물함 드롭 체감(역병 강도 19 Torment 상시 파밍에 하루 1~2개) |
 | tbhindex.com | https://tbhindex.com/wiki/runes , /wiki/relics , /wiki/reliquaries | v1.3.0 자칭 | 높음으로 추정 — **직접 열람 실패**(Cloudflare 봇 차단, 브라우저로도 불가). 검색 요약 수치만 사용 | 253노드 노드별 수치를 가진 유일한 곳으로 보임 |
 | taskbarherowiki.com | https://taskbarherowiki.com/runes | v1.00.09 | 중(구버전) | 197 runes |
 | taskbarhero.co (TASKBAR HERO ATLAS) | https://taskbarhero.co/mechanics | v1.00.09 기준, v1.00.13 보정 | 중(구버전) | 스탯별 룬 개수 일치 |
@@ -924,10 +932,9 @@ tbhindex.com(v1.3.0 데이터마인이라고 자칭, Cloudflare 차단으로 직
 1. **1.02.00 이후 추가된 룬 56노드의 노드별 데이터**(비용 곡선, 최대 레벨, 좌표, 선행 관계). 스탯별 합계와 일부 묶음 총비용만 확보. 원천은 tbhindex.com(차단). 공식 발표 합계(248)와 데이터(253)의 5노드 차이 원인.
 2. **룬 선행 조건의 기본 규칙**(부모 요구 레벨이 비어 있는 183노드: 1레벨이면 되는가, 최대 레벨이어야 하는가).
 3. **룬 초기화(respec) 기능의 존재·비용·환급률.** 공식 언급 없음, 팬 출처 상충.
-4. 룬 메뉴 해금 조건(영웅 레벨 3)의 1차 확인.
-5. 펫 동시 배치 수, 할로윈 펫의 한국어 명칭, 향후 이벤트 펫 재획득 가능 여부.
-6. 유물: 공명 조건이 유물함 2개 사이에서 합산되는지, 흰색 유물의 공명 색 계산, 유물함 슬롯 색에 흰색이 나오는지, 공명 효과 범위 수치의 결정 시점, 유물/유물함 **합성 레시피의 투입 수·성공률**, 오염된 유물/유물함의 상자별 드롭 확률, "Golden Relic - Broken Chain"의 획득 경로, 공명 효과 수(62 vs 63).
-7. 유물·펫 수정치가 코드의 어느 출처(ModSource)로 분류되는지, 룬의 고정 추가 골드/경험치에 % 배율이 곱해지는지.
-8. 업적 보상 유무(없는 것으로 보이나 게임 내 확인 필요), 도감·칭호 시스템 유무.
-9. 한국어 클라이언트의 공식 용어(유물/유물함/공명/조율 등).
-10. 11월 예고 업데이트(최대 레벨 상향, 신규 난이도)와 "시즌 1"이 영구 성장에 미칠 영향.
+4. 펫 동시 배치(동행) 수, 이벤트 펫의 재획득 가능 여부.
+5. 유물: 공명 조건이 유물함 2개 사이에서 합산되는지, 흰색 유물의 공명 색 계산, 유물함 슬롯 색에 흰색이 나오는지, 공명 효과 범위 수치의 결정 시점, 유물/유물함 **합성 레시피의 투입 수·성공률**, 오염된 유물/유물함의 상자별 드롭 확률, "Golden Relic - Broken Chain"의 획득 경로, 공명 효과 수(62 vs 63).
+6. 유물·펫 수정치가 코드의 어느 출처(ModSource)로 분류되는지, 룬의 고정 추가 골드/경험치에 % 배율이 곱해지는지.
+7. 업적 보상 유무(없는 것으로 보이나 게임 내 확인 필요), 도감·칭호 시스템 유무.
+8. 개별 유물 36종·유물함 62종·역병 룬의 한국어 공식 이름(시스템 용어는 확인됨).
+9. 11월 예고 업데이트(최대 레벨 상향, 신규 난이도)와 "시즌 1"이 영구 성장에 미칠 영향.
