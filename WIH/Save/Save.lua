@@ -13,6 +13,18 @@ Save.BACKUPS = 3
 -- 형식 버전별 변환 함수. migrations[n]은 n → n+1.
 Save.migrations = {}
 
+-- 1 → 2: 인벤토리, 장비, 상자, 재료가 생겼다. 빈 표를 만들어 준다.
+Save.migrations[1] = function(raw)
+    if type(raw.heroes) == "table" then
+        for _, h in pairs(raw.heroes) do
+            if type(h) == "table" and type(h.gear) ~= "table" then h.gear = {} end
+        end
+    end
+    if type(raw.inventory) ~= "table" then raw.inventory = { items = {}, bought = 0 } end
+    if type(raw.mail) ~= "table" then raw.mail = {} end
+    if type(raw.materials) ~= "table" then raw.materials = {} end
+end
+
 local function isNumber(v)
     return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge
 end
@@ -149,6 +161,8 @@ function Save.validate(state)
     for _, h in pairs(state.heroes) do
         while #h.bar > state.unlocks.skillSlots do table.remove(h.bar) end
     end
+    WIH.Inventory.validate(state, notes)
+    WIH.Chests.validate(state, notes)
 
     local party, seen = {}, {}
     if type(state.party) == "table" then
@@ -196,7 +210,7 @@ function Save.validate(state)
     if type(set.autoAdvance) ~= "boolean" then set.autoAdvance = true end
 
     if type(state.stats) ~= "table" then state.stats = {} end
-    for _, k in ipairs({ "kills", "bossKills", "clears", "fails", "goldEarned", "playSeconds" }) do
+    for _, k in ipairs({ "kills", "bossKills", "clears", "fails", "goldEarned", "playSeconds", "chestsOpened" }) do
         if not isNumber(state.stats[k]) or state.stats[k] < 0 then state.stats[k] = 0 end
     end
     return notes

@@ -16,6 +16,11 @@ local TICK = WIH.TICK
 local BETWEEN_STAGES = 1.0      -- [독자] 스테이지 사이의 준비 시간(초)
 local MAX_BACKLOG = 30          -- 한 번에 따라잡는 시간의 상한(초). 넘는 분량은 버린다
 
+-- 자동으로 열린 상자의 결과를 알린다.
+local function makeLootHandler(self)
+    return function(kind, result) self:emit("loot", kind, result) end
+end
+
 -- opts: seed, tuning = {hp, atk}, onEvent(함수)
 function Session.new(state, opts)
     opts = opts or {}
@@ -24,6 +29,10 @@ function Session.new(state, opts)
         acc = 0, wait = 0, runs = 0, runner = nil,
     }, S)
     if opts.onEvent then s.listeners[1] = opts.onEvent end
+    s.lootRng = WIH.Rng.new((opts.seed or 1) + 4242)       -- 상자 드롭과 개봉용. 전투의 난수와 섞이지 않게 따로 둔다
+    s.onLoot = makeLootHandler(s)
+    WIH.Inventory.ensure(state)
+    WIH.Chests.ensure(state)
     return s
 end
 
@@ -97,9 +106,18 @@ function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
             end
         end
         self:emit("kill", a, reward)
+        -- 상자: 확률, 획득 허용량, 보관 한도를 통과하면 하나를 받는다.
+        local chestKind = a.isBoss and "stage" or "normal"
+        if WIH.Chests.tryDrop(state, chestKind, self.stageKey, self.lootRng) then
+            self:emit("chest", chestKind)
+        end
     elseif ev == "clear" then
         Game.markCleared(state, self.stageKey)
         self:emit("clear", self.stageKey, self.runner and self.runner.totals)
+        if state.stage.cleared[self.stageKey] == 1 then
+            local given = WIH.Chests.firstClearReward(state, self.stageKey)
+            if given and #given > 0 then self:emit("firstClear", given) end
+        end
         self:chooseAfterClear()
     elseif ev == "fail" then
         state.stats.fails = state.stats.fails + 1
@@ -153,6 +171,11 @@ function S:advance(dt, maxTicks)
         if self.acc < 0 then self.acc = 0 end
         done = done + 1
         self.state.stats.playSeconds = self.state.stats.playSeconds + TICK
+        self.chestAcc = (self.chestAcc or 0) + TICK
+        if self.chestAcc >= 1 then       -- 상자의 허용량 충전과 자동 개봉은 1초 단위로 본다
+            WIH.Chests.tick(self.state, self.chestAcc, self.stageKey or Game.currentStageKey(self.state), self.lootRng, self.onLoot)
+            self.chestAcc = 0
+        end
         if self.wait > 0 then
             self.wait = self.wait - TICK
             if self.wait <= 0 then self.runner = nil end

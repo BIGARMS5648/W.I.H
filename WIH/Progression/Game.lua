@@ -10,7 +10,7 @@ local Level = WIH.module("Level")
 local Dungeons = WIH.module("Dungeons")
 local Game = WIH.module("Game")
 
-Game.SCHEMA = 1
+Game.SCHEMA = 2                  -- 2: 인벤토리, 장비, 상자, 재료가 생김
 Game.START_GOLD = 100            -- [원작] 시작 골드
 Game.HERO_UNLOCK_COST = 500      -- [원작] 영웅 해금 비용
 Game.BASE_PARTY_SLOTS = 1        -- [원작] 편성 칸은 룬으로 늘린다
@@ -22,7 +22,7 @@ local function fail(reason) return false, reason end
 
 local function newHero(heroId)
     local hero = Heroes.byId[heroId]
-    local h = { unlocked = true, level = 1, exp = 0, active = {}, passive = {}, bar = {} }
+    local h = { unlocked = true, level = 1, exp = 0, active = {}, passive = {}, bar = {}, gear = {} }
     if hero.forms then h.form = hero.defaultForm end
     return h
 end
@@ -44,6 +44,8 @@ function Game.new(faction, starter, now)
         settings = { autoRetry = true, repeatMode = false, autoAdvance = true },
         stats = { kills = 0, bossKills = 0, clears = 0, fails = 0, goldEarned = 0, playSeconds = 0 },
     }
+    WIH.Inventory.ensure(state)
+    WIH.Chests.ensure(state)
     return state
 end
 
@@ -255,7 +257,7 @@ function Game.buildParty(state)
             skills[#skills + 1] = { id, h.active[id] or 1 }
         end
         party[rank] = { heroId = heroId, form = h.form, level = h.level, passivePoints = h.passive, skills = skills,
-            heroState = h }
+            heroState = h, gear = WIH.Inventory.gearSheet(state, heroId) }
     end
     return party
 end

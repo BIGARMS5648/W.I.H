@@ -11,6 +11,7 @@ lua5.1 Test/test_progression.lua
 lua5.1 Test/test_stages.lua
 lua5.1 Test/test_game.lua
 lua5.1 Test/test_runes.lua
+lua5.1 Test/test_items.lua
 lua5.1 Test/wih_load_test.lua
 lua5.1 Test/test_ui.lua
 lua5.1 Test/envcheck_load_test.lua

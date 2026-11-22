@@ -237,7 +237,7 @@ hero("tin_medic", "TINKER", "치료 땜장이", "healer", "TOOL", "DRONE_MODULE"
 
 -- 무기 종류 [독자: 원작의 종류별 규칙을 따라 확장]
 Heroes.MAIN_WEAPONS = {
-    SWORD = { name = "한손검", speed = 40 }, GREATSWORD = { name = "양손검", speed = 35 }, AXE = { name = "도끼", speed = 45 },
+    SWORD = { name = "한손검", speed = 40 }, GREATSWORD = { name = "양손검", speed = 35 }, AXE = { name = "도끼", speed = 35 },
     MACE = { name = "둔기", speed = 30 }, DAGGER = { name = "단검", speed = 50 }, BOW = { name = "활", speed = 50 },
     CROSSBOW = { name = "석궁", speed = 35 }, GUN = { name = "총", speed = 35 }, STAFF = { name = "지팡이", speed = 25 },
     WAND = { name = "마법봉", speed = 30 }, TOOL = { name = "기계 공구", speed = 30 },

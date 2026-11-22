@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: W.I.H
 ## Notes: 와우 포에버 안에서 즐기는 독립형 방치 RPG
-## Version: 0.2.0
+## Version: 0.3.0
 ## SavedVariables: WIH_DB, WIH_DB_BACKUP, WIH_UI
 ## AddonCompartmentFunc: WIH_OnCompartmentClick
 ## IconTexture: Interface\Icons\INV_Misc_Gear_01
@@ -28,6 +28,13 @@ Progression\Level.lua
 Data\Monsters.lua
 Data\Dungeons.lua
 Stage\Runner.lua
+Data\ItemTable.lua
+Data\ItemTypes.lua
+Data\ChestTable.lua
+Data\Materials.lua
+Inventory\Items.lua
+Inventory\Inventory.lua
+Inventory\Chests.lua
 Progression\Game.lua
 Data\Runes.lua
 Progression\Runes.lua

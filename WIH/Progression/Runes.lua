@@ -81,14 +81,10 @@ Runes.STATS = {
 -- 해당 시스템을 구현할 때 여기서 지운다. 화면은 이 표를 보고 "미적용"을 표시한다.
 Runes.INACTIVE = {
     AdditionalGoldActBoss = "레이드", AdditionalExpActBoss = "레이드",
-    DropChanceNormalChestPercent = "상자", DropChanceStageBossChestPercent = "상자",
-    MaxAmountNormalChest = "상자", MaxAmountStageBossChest = "상자", MaxAmountActBossChest = "상자",
-    UnlockAutoOpenNormalChest = "상자", UnlockAutoOpenStageBossChest = "상자", UnlockAutoOpenActBossChest = "상자",
-    ReduceAutoOpenNormalChestTime = "상자", ReduceAutoOpenStageBossChestTime = "상자", ReduceAutoOpenActBossChestTime = "상자",
-    OpenOneTypeChestAllAtOnce = "상자", OpenAllTypeChestAllAtOnce = "상자",
-    CubeAlchemyGoldPercent = "큐브", CubeExpPercent = "큐브",
+    MaxAmountActBossChest = "레이드", UnlockAutoOpenActBossChest = "레이드", ReduceAutoOpenActBossChestTime = "레이드",
+    CubeExpPercent = "큐브",
     OfflineRewardGoldPercent = "오프라인 보상", OfflineRewardExpPercent = "오프라인 보상", UnlockOfflineReward = "오프라인 보상",
-    MaxInventorySlot = "인벤토리", UnlockStashPageCount = "보관함",
+    UnlockStashPageCount = "보관함",
 }
 
 -- 수치의 표기: "+10", "+5%", "-3초", "해금"
