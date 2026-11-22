@@ -90,7 +90,7 @@ local function updateHead()
     local parts = {}
     for _, kind in ipairs(Chests.KINDS) do
         local n = Chests.count(state, kind)
-        if n > 0 or kind ~= "raid" then parts[#parts + 1] = Chests.NAMES[kind]:gsub(" 상자", "") .. " " .. n end
+        if n > 0 or kind == "normal" or kind == "stage" then parts[#parts + 1] = Chests.SHORT[kind] .. " " .. n end
     end
     chestText:SetText("상자  " .. table.concat(parts, " · "))
     chestText:SetShown((frame:GetWidth() or DEF_W) >= 900)       -- 폭이 좁으면 왼쪽 표시와 겹치므로 감춘다

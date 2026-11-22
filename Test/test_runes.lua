@@ -5,9 +5,9 @@ local T = require("Test.t")
 local WIH = require("Test.engine").load()
 local Runes, RuneData, Game, Session, Save = WIH.Runes, WIH.RuneData, WIH.Game, WIH.Session, WIH.Save
 
-T.case("룬 표: 원작 197노드 + 추가 3노드, 조사 보고서의 합계와 일치", function()
-    local n, custom, cost, levels = 0, 0, 0, 0
-    local sum = {}
+T.case("룬 표: 원작 197노드 + 1.2.0 이후 56노드 + 추가 3노드, 조사 보고서의 합계와 일치", function()
+    local n, custom, added, cost, levels = 0, 0, 0, 0, 0
+    local sum, addedSum, addedCost = {}, {}, 0
     for key, node in pairs(RuneData.nodes) do
         n = n + 1
         T.eq(#node.cost, node.max, "비용 수 = 최대 레벨: " .. key)
@@ -15,6 +15,12 @@ T.case("룬 표: 원작 197노드 + 추가 3노드, 조사 보고서의 합계�
         T.ok(Runes.STATS[node.stat], "표시 이름이 없는 스탯: " .. node.stat)
         if node.custom then
             custom = custom + 1
+        elseif node.added then
+            added = added + 1
+            for i = 1, node.max do
+                addedCost = addedCost + node.cost[i]
+                addedSum[node.stat] = (addedSum[node.stat] or 0) + node.value[i]
+            end
         else
             for i = 1, node.max do
                 cost = cost + node.cost[i]
@@ -24,9 +30,21 @@ T.case("룬 표: 원작 197노드 + 추가 3노드, 조사 보고서의 합계�
         end
         if key ~= RuneData.ROOT then T.ok(node.parent and RuneData.nodes[node.parent], "부모가 없는 노드: " .. key) end
     end
-    T.eq(n, 200); T.eq(custom, 3)
-    T.eq(levels, 658, "총 레벨 수")
-    T.eq(cost, 10040090050, "전 노드 총비용")
+    T.eq(n, 256); T.eq(custom, 3); T.eq(added, 56)
+    T.eq(197 + added, 253, "원작 v1.3.0의 노드 수")
+    T.eq(levels, 658, "원래 197노드의 총 레벨 수")
+    T.eq(cost, 10040090050 + 3 * 0, "원래 197노드의 총비용")
+    T.near((cost + addedCost) / 50046840050, 1, 1e-4, "원작 트리 전체 비용(약 500억)과 맞음")
+    -- 1.2.0 이후 추가분 [원작: 스탯별 최대 합계의 차이]
+    T.eq(addedSum.AllHeroAttackDamage, 20, "전 영웅 공격력 고정 합 12 → 32")
+    T.eq(addedSum.DropChancePlagueNormalChestPercent, 2500, "원정 일반 상자 드롭 +250%")
+    T.eq(addedSum.DropChancePlagueStageBossChestPercent, 5500, "원정 보스 상자 드롭 +550%")
+    T.eq(addedSum.ReduceAutoOpenPlagueNormalChestTime, 60)
+    T.eq(addedSum.ReduceAutoOpenPlagueStageBossChestTime, 120)
+    T.eq(addedSum.ReduceAutoOpenPlagueActBossChestTime, 15)
+    T.eq(addedSum.MaxAmountPlagueActBossChest, 5)
+    T.eq(addedSum.WaveCountReduction, 2, "웨이브 수 감소 1 → 3")
+    T.eq(RuneData.nodes[3152].value[1], 10000, "1.3.0: 레이드 보스 경험치 노드 2,000 → 10,000")
     T.eq(sum.AllHeroAttackDamage, 12)
     T.eq(sum.AllHeroArmor, 90)
     T.eq(sum.AllHeroAttackDamagePercent, 600)
@@ -127,12 +145,12 @@ T.case("전투 룬은 전 영웅에게 적용되고, 골드·경험치 룬은 �
     end
     local ad0, armor0, gold0, kills0, hero0, waves0 = play(false)
     local ad1, armor1, gold1, kills1, hero1, waves1, s1 = play(true)
-    -- 공격력: (1 + 100 + 12) × 1.6, 방어도: (35 + 90) × 1.35
+    -- 룬 전부(1.2.0 이후 포함): 공격력 (1 + 100 + 32) × 1.7, 방어도 (35 + 140) × 1.45 [원작 최대 합계]
     T.near(ad0, 101, 1e-6)
-    T.near(ad1, (1 + 100 + 12) * 1.6, 1e-6)
+    T.near(ad1, (1 + 100 + 32) * 1.7, 1e-6)
     T.near(armor0, 35, 1e-6)
-    T.near(armor1, (35 + 90) * 1.35, 1e-6)
-    T.eq(waves1, waves0 - 1, "단축의 룬: 웨이브 수 −1")
+    T.near(armor1, (35 + 140) * 1.45, 1e-6)
+    T.eq(waves1, waves0 - 3, "단축의 룬: 웨이브 수 −3")
     T.ok(gold1 / math.max(kills1, 1) > gold0 / math.max(kills0, 1) * 2.5, "골드 룬이 처치당 골드를 늘려야 함")
     T.ok(hero1.level >= hero0.level, "경험치 룬")
     for key, level in pairs(s1.runes) do T.eq(level, RuneData.nodes[key].max, "전부 최대 레벨") end

@@ -75,6 +75,18 @@ Runes.STATS = {
     ReduceAutoOpenActBossChestTime = { "레이드 상자 자동 개봉 시간 단축", "sec" },
     OpenOneTypeChestAllAtOnce = { "같은 종류 상자 일괄 개봉", "unlock" },
     OpenAllTypeChestAllAtOnce = { "모든 상자 일괄 개봉", "unlock" },
+    -- 역병의 룬(원정 상자) [원작 1.2.0]
+    DropChancePlagueNormalChestPercent = { "원정 일반 상자 드롭 확률", "pct" },
+    DropChancePlagueStageBossChestPercent = { "원정 보스 상자 드롭 확률", "pct" },
+    MaxAmountPlagueNormalChest = { "원정 일반 상자 보관 한도", "flat" },
+    MaxAmountPlagueStageBossChest = { "원정 보스 상자 보관 한도", "flat" },
+    MaxAmountPlagueActBossChest = { "낙스라마스 상자 보관 한도", "flat" },
+    UnlockAutoOpenPlagueNormalChest = { "원정 일반 상자 자동 개봉", "unlock" },
+    UnlockAutoOpenPlagueStageBossChest = { "원정 보스 상자 자동 개봉", "unlock" },
+    UnlockAutoOpenPlagueActBossChest = { "낙스라마스 상자 자동 개봉", "unlock" },
+    ReduceAutoOpenPlagueNormalChestTime = { "원정 일반 상자 자동 개봉 시간 단축", "sec" },
+    ReduceAutoOpenPlagueStageBossChestTime = { "원정 보스 상자 자동 개봉 시간 단축", "sec" },
+    ReduceAutoOpenPlagueActBossChestTime = { "낙스라마스 상자 자동 개봉 시간 단축", "sec" },
 }
 
 -- 아직 이 효과를 쓰는 시스템이 들어오지 않은 스탯. 살 수는 있지만(뒤의 룬을 여는 조건이므로) 지금은 효과가 없다.

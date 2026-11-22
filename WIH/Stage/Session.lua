@@ -126,7 +126,7 @@ function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
         if a.def and a.def.id then WIH.Pets.onKill(state, a.def.id) end
         -- 상자: 확률, 획득 허용량, 보관 한도를 통과하면 하나를 받는다.
         if not self.inRaid then
-            local chestKind = a.isBoss and "stage" or "normal"
+            local chestKind = WIH.Chests.kindFor(self.stageKey, a.isBoss)
             if WIH.Chests.tryDrop(state, chestKind, self.stageKey, self.lootRng) then
                 self:emit("chest", chestKind)
             end

@@ -73,6 +73,11 @@ local function tooltipFor(key)
         for _, k in ipairs(kids) do names[#names + 1] = Runes.label(nodes[k].stat) end
         lines[#lines + 1] = { "이 룬이 여는 룬: " .. table.concat(names, ", "), C.dim }
     end
+    if node.added then
+        lines[#lines + 1] = { "원작 1.2.0 이후에 추가된 룬입니다. 수치는 원작, 비용은 추정 또는 이 애드온이 정한 값입니다.", C.dim }
+    elseif node.custom then
+        lines[#lines + 1] = { "이 애드온이 더한 룬입니다(편성 4·5칸, 스킬 4칸).", C.dim }
+    end
     local why = Runes.INACTIVE[node.stat]
     if why then
         lines[#lines + 1] = { "미적용: " .. why .. " 기능이 아직 구현되지 않아 지금은 효과가 없습니다. 뒤의 룬을 여는 조건으로는 쓰입니다.", C.warn }

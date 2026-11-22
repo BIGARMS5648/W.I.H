@@ -48,6 +48,7 @@ Inventory\Cube.lua
 Data\Looks.lua
 Progression\Game.lua
 Data\Runes.lua
+Data\RunesAdded.lua
 Progression\Runes.lua
 Stage\Session.lua
 Progression\Pets.lua

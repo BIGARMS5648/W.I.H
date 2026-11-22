@@ -127,7 +127,46 @@ T.case("낙스라마스: 열림 조건, 오염된 증표, 보스 연속, 클리�
     while (s.stage.cleared[key] or 0) < 1 and t < 5000 do sess:advance(1, 40); t = t + 1 end
     T.eq(s.stage.cleared[key], 1, "클리어")
     T.eq(s.materials[190102], nil, "오염된 증표를 씀")
-    T.eq(Chests.count(s, "raid"), 1, "레이드 상자 1개")
+    T.eq(Chests.count(s, "praid"), 1, "낙스라마스 상자 1개(원정 보관함)")
+    T.eq(Chests.count(s, "raid"), 0, "레이드 보관함에는 들어가지 않는다")
+end)
+
+local Rng = WIH.Rng
+T.case("원정 상자: 따로 보관하고, 역병의 룬을 받고, 허용량은 원정에 있을 때만 찬다", function()
+    local s = Game.new("Horde", "war_prot", 0)
+    local key = Expeditions.keys[2][1]
+    T.eq(Chests.kindFor(key, false), "pnormal")
+    T.eq(Chests.kindFor(key, true), "pstage")
+    T.eq(Chests.kindFor(1101, false), "normal")
+    T.eq(Chests.raidKind(Expeditions.naxxKeys[2][1]), "praid")
+    T.eq(Chests.raidKind(Raids.key(2, 1)), "raid")
+    -- 룬: 원정 상자에는 역병의 룬만, 일반 지역 상자에는 일반 룬만
+    local base = Chests.dropChance(s, "pnormal", key)
+    for k, node in pairs(WIH.RuneData.nodes) do
+        if node.stat == "DropChancePlagueNormalChestPercent" or node.stat == "MaxAmountPlagueNormalChest" then s.runes[k] = node.max end
+    end
+    T.near(Chests.dropChance(s, "pnormal", key) / base, 3.5, 1e-9, "역병 탐색의 룬 +250%")
+    T.near(Chests.dropChance(s, "normal", key), base, 1e-12, "일반 상자 확률은 그대로")
+    T.eq(Chests.cap(s, "pnormal"), Chests.BASE_CAP + 5)
+    T.eq(Chests.cap(s, "normal"), Chests.BASE_CAP)
+    -- 허용량
+    s.chests.pnormal.allowance, s.chests.normal.allowance = 0, 0
+    Chests.tick(s, 600, 1101, Rng.new(1))
+    T.eq(s.chests.pnormal.allowance, 0, "일반 지역에서는 원정 상자 허용량이 차지 않는다")
+    T.ok(s.chests.normal.allowance > 0)
+    s.chests.normal.allowance = 0
+    Chests.tick(s, 600, key, Rng.new(1))
+    T.ok(s.chests.pnormal.allowance > 0, "원정에서는 찬다")
+    T.eq(s.chests.normal.allowance, 0, "원정에서는 일반 지역 상자 허용량이 차지 않는다")
+    -- 실제 진행: 원정에서 처치하면 원정 보관함으로
+    s.stage.cleared[Raids.key(2, 1)] = 1
+    s.supply = 100
+    T.ok(Expeditions.start(s, 2, 1))
+    local session = Session.new(s, { seed = 5 })
+    session.account = strong()
+    for _ = 1, 600 do session:advance(1, 100000) end
+    T.ok(Chests.count(s, "pnormal") + Chests.count(s, "pstage") > 0, "원정 상자가 쌓인다")
+    T.eq(Chests.count(s, "normal") + Chests.count(s, "stage"), 0, "일반 지역 보관함에는 들어가지 않는다")
 end)
 
 if not T.report("test_expeditions") then os.exit(1) end

@@ -221,13 +221,15 @@ local function create(parent)
     chest:SetPoint("BOTTOMRIGHT", -12, 10)
     chest:SetHeight(78)
     f.chestRows = {}
-    for i, kind in ipairs(Chests.KINDS) do
+    f.chestGroup = "regular"
+    for i = 1, 3 do
         local row = CreateFrame("Frame", nil, chest)
         row:SetSize(296, 24)
         row:SetPoint("TOPLEFT", 12 + (i - 1) * 308, -6)
         row.text = UI.text(row, 12, C.text)
         row.text:SetPoint("LEFT", 0, 0)
         row.open = UI.button(row, "열기", 48, 22, function()
+            local kind = row.kind
             local result, why = Chests.open(App.state, kind, App.session.lootRng)
             if not result then
                 WIH.Main.notice(why, C.bad)
@@ -239,6 +241,7 @@ local function create(parent)
         end)
         row.open:SetPoint("LEFT", 140, 0)
         row.all = UI.button(row, "모두 열기", 70, 22, function()
+            local kind = row.kind
             local s = App.state
             if not Chests.canOpenAll(s) then return WIH.Main.notice("모두 열기는 룬으로 해금합니다.", C.bad) end
             local n, last = 0, nil
@@ -257,8 +260,14 @@ local function create(parent)
         row.all.tooltip = { title = "모두 열기", lines = { "보관함의 이 종류 상자를 한 번에 엽니다. 룬에서 해금합니다." } }
         row.timer = UI.text(row, 11, C.dim)
         row.timer:SetPoint("TOPLEFT", 0, -26)
-        f.chestRows[kind] = row
+        f.chestRows[i] = row
     end
+    f.chestToggle = UI.button(chest, "원정 상자 보기", 110, 22, function()
+        f.chestGroup = f.chestGroup == "regular" and "plague" or "regular"
+        UI.screens.bag.refresh(f)
+    end)
+    f.chestToggle:SetPoint("BOTTOMRIGHT", -12, 4)
+    f.chestToggle.tooltip = { title = "원정 상자", lines = { "원정과 낙스라마스에서 나온 상자는 따로 보관합니다.", "드롭 확률·보관 한도·자동 개봉은 역병의 룬이 정합니다." } }
     f.extra = UI.text(chest, 11, C.sub)
     f.extra:SetPoint("BOTTOMLEFT", 12, 8)
     f.claim = UI.button(chest, "임시 보관함에서 꺼내기", 150, 22, function()
@@ -266,7 +275,7 @@ local function create(parent)
         WIH.Main.notice(n > 0 and (n .. "개를 가방으로 옮겼습니다.") or "가방에 빈칸이 없습니다.", n > 0 and C.good or C.bad)
         UI.screens.bag.refresh(f)
     end)
-    f.claim:SetPoint("BOTTOMRIGHT", -12, 4)
+    f.claim:SetPoint("RIGHT", f.chestToggle, "LEFT", -6, 0)
     f.acc = 0
     return f
 end
@@ -330,18 +339,28 @@ end
 
 local function timerText(s, kind)
     if kind == "raid" then return "레이드를 클리어하면 받습니다" end
+    if kind == "praid" then return "낙스라마스를 클리어하면 받습니다" end
     local c = s.chests[kind]
     if c.allowance >= 1 then return "상자를 받을 수 있습니다" end
-    local info = ChestTable.STAGE[Game.currentStageKey(s)]
-    local minutes = info and (kind == "normal" and info.cool or info.bossCool) or 0
+    local key = s.stage.expedition or Game.currentStageKey(s)
+    if Chests.isPlague(kind) ~= (s.stage.expedition ~= nil) then
+        return Chests.isPlague(kind) and "원정에 있을 때 다음 상자가 찹니다" or "일반 지역에 있을 때 다음 상자가 찹니다"
+    end
+    local info = ChestTable.STAGE[key]
+    local minutes = info and ((kind == "normal" or kind == "pnormal") and info.cool or info.bossCool) or 0
     local left = (1 - c.allowance) * minutes * 60
     return string.format("다음 상자까지 %d:%02d", math.floor(left / 60), math.floor(left % 60))
 end
 
 local function paintChests(f)
     local s = App.state
-    for _, kind in ipairs(Chests.KINDS) do
-        local row = f.chestRows[kind]
+    local group = f.chestGroup == "plague" and Chests.PLAGUE or Chests.REGULAR
+    local plagueCount = 0
+    for _, kind in ipairs(Chests.PLAGUE) do plagueCount = plagueCount + Chests.count(s, kind) end
+    f.chestToggle:setText(f.chestGroup == "plague" and "일반 지역 상자" or ("원정 상자" .. (plagueCount > 0 and (" " .. plagueCount) or "") .. " 보기"))
+    for i, kind in ipairs(group) do
+        local row = f.chestRows[i]
+        row.kind = kind
         local n, cap = Chests.count(s, kind), Chests.cap(s, kind)
         row.text:SetText(string.format("%s  %d / %d", Chests.NAMES[kind], n, cap))
         row.text:SetTextColor(UI.rgb(n >= cap and C.warn or C.text))

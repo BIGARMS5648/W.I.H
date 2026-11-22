@@ -1,6 +1,8 @@
 -- 보물상자: 드롭, 획득 허용량, 보관, 개봉. 아이템은 모두 상자에서 나온다. [원작]
 -- 저장 형태: state.chests[종류] = { list = { 표 번호, ... }, allowance = 허용량, auto = 자동 개봉까지 흐른 시간(초) }
 -- 종류: normal(일반 몬스터가 주는 일반 상자), stage(스테이지 보스가 주는 스테이지 상자), raid(레이드를 클리어하면 받는 상자)
+--       pnormal, pstage(원정에서 나오는 상자), praid(낙스라마스를 클리어하면 받는 상자). 원정 상자는 따로 보관하고
+--       룬도 따로 받는다(역병의 룬). [원작 1.2.0: 역병지대 상자는 별도 보관함]
 
 local _, WIH = ...
 local Tables = WIH.module("Tables")
@@ -11,8 +13,12 @@ local Materials = WIH.module("Materials")
 local Inventory = WIH.module("Inventory")
 local Chests = WIH.module("Chests")
 
-Chests.KINDS = { "normal", "stage", "raid" }
-Chests.NAMES = { normal = "일반 상자", stage = "스테이지 상자", raid = "레이드 상자" }
+Chests.KINDS = { "normal", "stage", "raid", "pnormal", "pstage", "praid" }
+Chests.REGULAR = { "normal", "stage", "raid" }
+Chests.PLAGUE = { "pnormal", "pstage", "praid" }
+Chests.NAMES = { normal = "일반 상자", stage = "스테이지 상자", raid = "레이드 상자",
+    pnormal = "원정 일반 상자", pstage = "원정 보스 상자", praid = "낙스라마스 상자" }
+Chests.SHORT = { normal = "일반", stage = "보스", raid = "레이드", pnormal = "원정", pstage = "원정 보스", praid = "낙스" }
 Chests.BASE_CAP = 5             -- [추정] 룬이 없을 때의 보관 한도
 Chests.ALLOWANCE_CAP = 2        -- [독자] 허용량의 누적 한도. 원작의 한도는 확인되지 않았다
 Chests.START_ALLOWANCE = 1      -- [독자] 새 게임은 허용량 1에서 시작한다
@@ -25,7 +31,27 @@ local RUNE = {
         reduce = "ReduceAutoOpenStageBossChestTime", rate = "bossChest", table = "boss", cool = "bossCool" },
     -- 레이드 상자는 확률이나 허용량이 아니라 입장 재료로 제한된다. 클리어하면 반드시 하나를 받는다. [원작]
     raid = { cap = "MaxAmountActBossChest", auto = "UnlockAutoOpenActBossChest", reduce = "ReduceAutoOpenActBossChestTime" },
+    pnormal = { cap = "MaxAmountPlagueNormalChest", chance = "DropChancePlagueNormalChestPercent", auto = "UnlockAutoOpenPlagueNormalChest",
+        reduce = "ReduceAutoOpenPlagueNormalChestTime", rate = "chest", table = "normal", cool = "cool", plague = true },
+    pstage = { cap = "MaxAmountPlagueStageBossChest", chance = "DropChancePlagueStageBossChestPercent", auto = "UnlockAutoOpenPlagueStageBossChest",
+        reduce = "ReduceAutoOpenPlagueStageBossChestTime", rate = "bossChest", table = "boss", cool = "bossCool", plague = true },
+    praid = { cap = "MaxAmountPlagueActBossChest", auto = "UnlockAutoOpenPlagueActBossChest", reduce = "ReduceAutoOpenPlagueActBossChestTime", plague = true },
 }
+
+-- 이 스테이지에서 처치로 받는 상자의 종류. boss = 스테이지 보스였는지
+function Chests.kindFor(stageKey, boss)
+    local stage = Tables.STAGES[stageKey]
+    if stage and stage.expedition then return boss and "pstage" or "pnormal" end
+    return boss and "stage" or "normal"
+end
+
+-- 레이드(또는 낙스라마스)를 클리어하면 받는 상자의 종류
+function Chests.raidKind(stageKey)
+    local stage = Tables.STAGES[stageKey]
+    return (stage and stage.naxx) and "praid" or "raid"
+end
+
+function Chests.isPlague(kind) return RUNE[kind] and RUNE[kind].plague == true end
 
 local function runeTotal(state, stat)
     return WIH.Runes and WIH.Runes.total(state, stat) or 0
@@ -96,10 +122,11 @@ function Chests.giveRaid(state, raidKey, rng)
     local info = ChestTable.STAGE[raidKey]
     local tableId = info and info.raid
     if not tableId then return nil end
-    local c = state.chests.raid
+    local kind = Chests.raidKind(raidKey)
+    local c = state.chests[kind]
     c.list[#c.list + 1] = tableId
-    if #c.list > Chests.cap(state, "raid") then
-        return "opened", Chests.open(state, "raid", rng)
+    if #c.list > Chests.cap(state, kind) then
+        return "opened", Chests.open(state, kind, rng)
     end
     return "stored"
 end
@@ -161,9 +188,11 @@ end
 -- onLoot(kind, result)는 자동으로 열린 상자마다 불린다.
 function Chests.tick(state, dt, stageKey, rng, onLoot)
     local info = ChestTable.STAGE[stageKey]
+    local inPlague = Tables.STAGES[stageKey] and Tables.STAGES[stageKey].expedition ~= nil
     for _, kind in ipairs(Chests.KINDS) do
         local c = state.chests[kind]
-        local minutes = info and RUNE[kind].cool and info[RUNE[kind].cool]
+        -- 허용량은 그 상자가 나오는 곳에 있을 때만 찬다(원정 상자는 원정에서, 일반 지역 상자는 일반 지역에서) [독자]
+        local minutes = info and RUNE[kind].cool and (RUNE[kind].plague == true) == inPlague and info[RUNE[kind].cool]
         if minutes and c.allowance < Chests.ALLOWANCE_CAP then
             c.allowance = c.allowance + dt / (minutes * 60)
             if c.allowance > Chests.ALLOWANCE_CAP then c.allowance = Chests.ALLOWANCE_CAP end
