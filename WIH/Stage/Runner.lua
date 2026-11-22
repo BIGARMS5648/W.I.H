@@ -131,7 +131,8 @@ function R:onBattleEvent(ev, a, b)
         -- 경험치: 살아 있는 영웅 각자가 전액을 받고, 각자의 레벨 차 페널티를 적용한다. [추정]
         for rank, u in ipairs(self.heroes) do
             if u.alive then
-                local level = (u.state and u.state.level) or 1
+                local st = u.state
+                local level = (st and st.heroState and st.heroState.level) or (st and st.level) or 1
                 local gain = reward.exp * Level.expPenalty(level, self.stage.level) * u:get("IncreaseExpAmount")
                     + u:get("AdditionalExp")
                 totals.exp[rank] = totals.exp[rank] + gain
