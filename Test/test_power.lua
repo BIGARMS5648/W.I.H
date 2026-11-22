@@ -113,4 +113,61 @@ T.case("모델 대응표: 영웅 30명과 보스 전원에 번호가 있고, 일
     T.eq(Models.candidates({ kind = "summon", owner = owner }, "Horde")[1], Models.SUMMONS.HUNTER)
 end)
 
+T.case("겉모습 대응표: 영웅 30명의 종족, 직업·단계별 옷, 무기 종류별 겉모습이 빠짐없이 있다", function()
+    local Looks = WIH.Looks
+    for _, hero in ipairs(Heroes.list) do
+        local pair = Looks.RACE[hero.id]
+        T.ok(pair and #pair == 2, hero.name .. ": 종족이 없음")
+        for i = 1, 2 do
+            T.ok(pair[i][1] >= 1 and pair[i][1] <= 11 and (pair[i][2] == 0 or pair[i][2] == 1), hero.name .. ": 종족·성별 값")
+        end
+        T.ok(Looks.ARMOR_CLASS[hero.class], hero.name .. ": 방어구 계열이 없음")
+        for tier = 1, 6 do
+            local set = Looks.set(hero.class, tier)
+            T.ok(set and set.chest and set.legs and set.hands and set.feet, hero.name .. ": 단계 " .. tier .. "의 옷이 모자람")
+        end
+        T.ok(Looks.WEAPONS[hero.main] and #Looks.WEAPONS[hero.main] == 6, hero.name .. ": 주무기의 겉모습이 없음")
+    end
+    for level in pairs(Items.ALCHEMY_LEVEL) do T.ok(Looks.TIER[level], "아이템 레벨 " .. level .. "의 겉모습 단계가 없음") end
+end)
+
+T.case("겉모습: 낀 장비에 따라 달라지고, 형태가 있는 영웅은 형태의 모델을 쓴다", function()
+    local Looks = WIH.Looks
+    local s = Game.new("Alliance", "mag_fire", 0)
+    local bare = Looks.forHero(s, "mag_fire")
+    T.eq(bare.race, 1); T.eq(bare.sex, 0)
+    T.eq(table.concat(bare.items, ","), "56,55", "맨몸이면 기본 옷(로브와 신발)")
+    Inventory.add(s, Items.find("STAFF", 65, 4).id); Inventory.equip(s, "mag_fire", 1)
+    local withStaff = Looks.forHero(s, "mag_fire")
+    T.ok(withStaff.key ~= bare.key)
+    T.eq(withStaff.items[#withStaff.items], Looks.WEAPONS.STAFF[5], "레벨 65 지팡이의 겉모습")
+    Inventory.add(s, Items.find("ARMOR", 30, 2).id); Inventory.equip(s, "mag_fire", 1)
+    local set = Looks.set("MAGE", 3)
+    local dressed = Looks.forHero(s, "mag_fire")
+    T.eq(dressed.items[1], set.chest); T.eq(dressed.items[2], set.shoulder); T.eq(dressed.items[3], set.legs)
+    -- 투구·장갑·신발은 그 칸에 낀 것의 단계를 따른다
+    Inventory.add(s, Items.find("HELMET", 90, 5).id); Inventory.equip(s, "mag_fire", 1)
+    Inventory.add(s, Items.find("GLOVES", 50, 2).id); Inventory.equip(s, "mag_fire", 1)
+    local full = Looks.forHero(s, "mag_fire")
+    local has = {}
+    for _, id in ipairs(full.items) do has[id] = true end
+    T.ok(has[Looks.set("MAGE", 6).head], "레벨 90 투구의 겉모습")
+    T.ok(has[Looks.set("MAGE", 4).hands], "레벨 50 장갑의 겉모습")
+    -- 장신구와 보주는 겉모습에 나타나지 않는다
+    local before = Looks.forHero(s, "mag_fire").key
+    Inventory.add(s, Items.find("ORB", 50, 2).id); Inventory.equip(s, "mag_fire", 1)
+    Inventory.add(s, Items.find("RING", 50, 2).id); Inventory.equip(s, "mag_fire", 1)
+    T.eq(Looks.forHero(s, "mag_fire").key, before)
+    -- 방패는 보이고, 보조 무기는 왼손에 든다
+    local w = Game.new("Horde", "war_fury", 0)
+    Inventory.add(w, Items.find("OFFHAND", 30, 2).id); Inventory.equip(w, "war_fury", 1)
+    T.eq(Looks.forHero(w, "war_fury").offhand, Looks.WEAPONS.OFFHAND[3])
+    T.eq(Looks.forHero(w, "war_fury").race, 8, "호드의 분노 전사는 트롤")
+    -- 야성 드루이드는 형태의 모델
+    local d = Game.new("Alliance", "dru_feral", 0)
+    T.eq(Looks.forHero(d, "dru_feral"), nil)
+    -- 해금하지 않은 영웅도 기본 옷차림을 볼 수 있다
+    T.ok(Looks.forHero(s, "war_prot") ~= nil)
+end)
+
 if not T.report("test_power") then os.exit(1) end
