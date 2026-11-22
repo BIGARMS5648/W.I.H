@@ -176,13 +176,17 @@ function R:spawnWave()
     self:emit("wave", self.wave, self.waves)
 end
 
+-- 원정 강도 n에서 나오는 보스의 순번(보스 count명 중) [원작 구조: 강도 20은 마지막 보스]
+function Runner.rotationTurn(n, count)
+    if n >= 20 then return count end
+    return (n - 1) % (count - 1) + 1
+end
+
 function R:spawnBoss()
     local ids = self.section.bosses
     local turn = self.bossIndex
     -- 원정: 강도에 따라 보스가 돌아가며 나오고, 강도 20은 마지막 보스다 [원작 구조]
-    if self.stage.bossRotation then
-        turn = self.stage.bossRotation >= 20 and #ids or ((self.stage.bossRotation - 1) % (#ids - 1) + 1)
-    end
+    if self.stage.bossRotation then turn = Runner.rotationTurn(self.stage.bossRotation, #ids) end
     local id = ids[(turn - 1) % #ids + 1]
     local def = Monsters.defs[id]
     self.boss = Runner.spawnMonster(self.battle, def, Runner.bossValues(self.stage, self.section, def), self:frontX() + BOSS_GAP, self.tuning)

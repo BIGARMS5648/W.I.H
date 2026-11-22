@@ -179,6 +179,86 @@ function Cube.alchemy(state, indexes)
     return gold, n, ups, #indexes - #picked
 end
 
+------------------------------------------------------------------------
+-- 부식: 연금술처럼 아이템을 넣되 골드 대신 원정 보급품을 얻는다 [원작 규칙 1.2.0]
+--   수치 [추정: 조사 보고서 03 9절의 관찰값과 역산]. 장비 = 등급 기본값 × 부위 계수(연금술과 같은 계수), 레벨은 반영하지 않는다.
+--   재료 1개 = 등급 값. 역병 열매는 재료 값의 5배 [독자]. 큐브 레벨 + 21을 넘는 아이템은 넣을 수 없다 [원작].
+--   보급품이 가득 차면 거기서 멈추고 남은 아이템은 쓰지 않는다 [독자]. 큐브 경험치는 연금술과 같게 준다 [추정].
+--   열리는 조건: 원정이 하나라도 열렸을 때 [독자: 원작의 해금 조건 미확인]
+------------------------------------------------------------------------
+
+Cube.NAMES.CORROSION = "부식"
+Cube.CORRODE_GEAR = { 2, 2, 3, 4, 6, 8, 12, 16, 24, 32 }
+Cube.CORRODE_MAT = { 2, 3, 4, 6, 8, 12, 16, 24, 32, 48 }
+Cube.FRUIT_MULT = 5
+
+function Cube.corrosionUnlocked(state)
+    for d = 2, 4 do
+        if WIH.Expeditions.unlocked(state, d) then return true end
+    end
+    return false
+end
+
+function Cube.corrodeValue(item)
+    local curve = Items.TYPES[item.type].curve
+    return math.max(1, math.floor(Cube.CORRODE_GEAR[item.grade] * Items.ALCHEMY_CURVE[curve] / 1000 + 0.5))
+end
+
+function Cube.corrodeMaterialValue(id)
+    local def = Materials.defs[id]
+    if not def or def.kind == "SOULSTONE" then return nil end
+    local v = Cube.CORRODE_MAT[def.grade]
+    if def.kind == "ETC" then v = v * Cube.FRUIT_MULT end
+    return v
+end
+
+local function supplyRoom(state)
+    return WIH.Expeditions.SUPPLY_MAX - state.supply
+end
+
+-- 장비 부식. 돌려주는 값: 얻은 보급품, 쓴 개수, 오른 큐브 레벨 수
+function Cube.corrode(state, indexes)
+    if not Cube.corrosionUnlocked(state) then return fail("원정이 열리면 쓸 수 있습니다.") end
+    if supplyRoom(state) < 1 then return fail("원정 보급품이 가득 찼습니다.") end
+    local order = {}
+    for _, index in ipairs(indexes) do order[#order + 1] = index end
+    table.sort(order, function(a, b) return a > b end)
+    local gained, used, exp = 0, 0, 0
+    for _, index in ipairs(order) do
+        if supplyRoom(state) < 1 then break end
+        local entry = state.inventory.items[index]
+        local item = entry and Items.byId[entry.id]
+        if item and not entry.lock and Cube.canAlchemize(state, item) then
+            local v = Cube.corrodeValue(item)
+            local add = math.min(v, supplyRoom(state))
+            state.supply = state.supply + add
+            gained = gained + add
+            exp = exp + Cube.itemExp(state, item)
+            table.remove(state.inventory.items, index)
+            used = used + 1
+        end
+    end
+    if used == 0 then return fail("넣을 수 있는 장비가 없습니다(잠금, 레벨 제한).") end
+    Inventory.claimMail(state)
+    return gained, used, Cube.addExp(state, exp)
+end
+
+-- 재료 부식: 보급품이 차는 만큼만 쓴다.
+function Cube.corrodeMaterial(state, id, count)
+    if not Cube.corrosionUnlocked(state) then return fail("원정이 열리면 쓸 수 있습니다.") end
+    local v = Cube.corrodeMaterialValue(id)
+    if not v then return fail("부식에 쓸 수 없는 재료입니다.") end
+    local have = state.materials[id] or 0
+    if have <= 0 then return fail("재료가 없습니다.") end
+    if supplyRoom(state) < 1 then return fail("원정 보급품이 가득 찼습니다.") end
+    count = math.min(count or have, have, math.ceil(supplyRoom(state) / v))
+    local add = math.min(v * count, supplyRoom(state))
+    state.supply = state.supply + add
+    state.materials[id] = have - count
+    if state.materials[id] <= 0 then state.materials[id] = nil end
+    return add, count, Cube.addExp(state, Cube.materialExp(state, id) * count)
+end
+
 -- 재료를 골드로(연금술) [원작: 재료는 등급 기본 골드 × 12]
 function Cube.alchemyMaterial(state, id, count)
     local have = state.materials[id] or 0

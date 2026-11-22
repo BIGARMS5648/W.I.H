@@ -95,7 +95,10 @@ end
 function Expeditions.start(state, d, n)
     if not Expeditions.unlocked(state, d) then return fail("그 난이도의 첫 레이드를 클리어해야 열립니다.") end
     if not Expeditions.intensityUnlocked(state, d, n) then return fail("앞 강도를 클리어해야 열립니다.") end
-    if state.supply < Expeditions.SUPPLY_ENTRY then return fail("원정 보급품이 " .. Expeditions.SUPPLY_ENTRY .. " 이상 있어야 합니다.") end
+    -- 원정 안에서 강도만 바꿀 때는 입장 조건(30)을 다시 묻지 않는다 [독자]
+    local inside = state.stage.expedition and Tables.STAGES[state.stage.expedition] and Tables.STAGES[state.stage.expedition].expedition
+    local need = (inside and inside.difficulty == d) and 1e-9 or Expeditions.SUPPLY_ENTRY
+    if state.supply < need then return fail("원정 보급품이 " .. Expeditions.SUPPLY_ENTRY .. " 이상 있어야 합니다.") end
     state.stage.expedition = Expeditions.keys[d][n]
     state.stage.raidKey = nil
     return true

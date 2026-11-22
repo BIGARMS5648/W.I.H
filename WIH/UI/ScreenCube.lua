@@ -12,7 +12,7 @@ local CubeTable = WIH.module("CubeTable")
 
 local C = UI.C
 local LIST_W = 214
-local PAGES = { "SYNTHESIS", "CRAFTING", "DECORATION", "ENGRAVING", "INSCRIPTION", "EXTRACTION", "OFFERING", "ALCHEMY" }
+local PAGES = { "SYNTHESIS", "CRAFTING", "DECORATION", "ENGRAVING", "INSCRIPTION", "EXTRACTION", "OFFERING", "ALCHEMY", "CORROSION" }
 local PAGE_TEXT = {
     SYNTHESIS = "같은 등급·같은 분류 9개를 넣으면 무작위 1개가 나옵니다. 전설 이하는 반드시 등급이 오르고, 불멸부터는 실패하면 같은 등급이 나옵니다. 등급이 떨어지거나 사라지는 일은 없습니다.",
     CRAFTING = "부위와 단계를 고르고 재료를 넣으면 그 부위의 무작위 장비가 나옵니다. 일반 등급은 나오지 않습니다.",
@@ -21,6 +21,7 @@ local PAGE_TEXT = {
     INSCRIPTION = "아르카나 이상 장비의 각인 칸에 두루마리를 넣어 여러 후보 중 하나를 붙입니다.",
     EXTRACTION = "붙인 능력치 한 줄을 골드를 내고 지웁니다. 넣은 재료는 돌아오지 않습니다.",
     OFFERING = "공물 주화와 수수료를 바쳐 무작위 아이템을 얻습니다.",
+    CORROSION = "장비나 재료를 넣어 원정 보급품을 채웁니다. 역병 열매는 많이 채웁니다. 보급품이 가득 차면 멈추고 남은 것은 쓰지 않습니다.",
     ALCHEMY = "재료를 골드로 바꿉니다. 장비의 연금술은 가방 화면의 '팔기'입니다.",
 }
 local GRADE_TEXT = function(g) return Items.GRADES[g].name end
@@ -558,6 +559,50 @@ local function paintOffering(f, s)
     f.go:setEnabled(f.selectedMat ~= nil and s.gold >= (fees[f.selectedMat] or 0) and Cube.unlocked(s, Cube.find("OFFERING")))
 end
 
+local function paintCorrosion(f, s)
+    local room = math.floor(WIH.Expeditions.SUPPLY_MAX - s.supply)
+    paintMaterialList(f, s, function(id) return Cube.corrodeMaterialValue(id) ~= nil end, "재료",
+        function(id) return "보급품 +" .. Cube.corrodeMaterialValue(id) .. "씩" end)
+    -- 오른쪽: 잠그지 않은 장비
+    f.rightList:Show(); f.rightLabel:Show()
+    f.rightLabel:SetText("장비 (누르면 넣을 목록에 더하거나 뺍니다)")
+    f.corrodePick = f.corrodePick or {}
+    local m = 0
+    for i, entry in ipairs(s.inventory.items) do
+        local item = Items.byId[entry.id]
+        if item and not entry.lock then
+            m = m + 1
+            local r = f.rightList:row(m)
+            r.data = i
+            r.icon:set(item.icon)
+            r.name:SetText(Items.name(item))
+            r.name:SetTextColor(UI.rgb(Items.GRADES[item.grade].color))
+            r.right:SetText(Cube.canAlchemize(s, item) and ("+" .. Cube.corrodeValue(item)) or "레벨 제한")
+            r:setSelected(f.corrodePick[i] == true)
+            r.tooltip = nil
+            r:Show()
+        end
+    end
+    f.rightList:finish(m)
+    local gear = 0
+    for i in pairs(f.corrodePick) do
+        local entry = s.inventory.items[i]
+        local item = entry and Items.byId[entry.id]
+        if item and not entry.lock then gear = gear + Cube.corrodeValue(item) else f.corrodePick[i] = nil end
+    end
+    f.odds:Show()
+    f.odds:ClearAllPoints()
+    f.odds:SetPoint("BOTTOMLEFT", 0, 0)
+    f.odds:SetPoint("BOTTOMRIGHT", 0, 0)
+    local lines = { string.format("원정 보급품  %d / %d", math.floor(s.supply), WIH.Expeditions.SUPPLY_MAX) }
+    if not Cube.corrosionUnlocked(s) then lines[#lines + 1] = "|cffd06058원정이 열리면(악몽 이상 첫 레이드 클리어) 쓸 수 있습니다.|r" end
+    if gear > 0 then lines[#lines + 1] = "고른 장비  보급품 +" .. gear .. (gear > room and ("  (|cffc9a45c" .. room .. "까지만 차고 나머지 장비는 남습니다|r)") or "") end
+    f.odds:SetText(table.concat(lines, "\n"))
+    local any = f.selectedMat ~= nil or next(f.corrodePick) ~= nil
+    f.go:setText(f.selectedMat and "재료 부식" or "장비 부식")
+    f.go:setEnabled(any and room >= 1 and Cube.corrosionUnlocked(s))
+end
+
 local function paintAlchemy(f, s)
     paintMaterialList(f, s, function(_, def) return def.kind ~= "SOULSTONE" end, "재료",
         function(id) return UI.number(Items.GRADES[Materials.defs[id].grade].gold * 12) .. " G씩" end)
@@ -582,13 +627,18 @@ local function autofill(f)
 end
 
 local function pickLeft(f, btn)
-    if f.page == "OFFERING" or f.page == "ALCHEMY" then f.selectedMat = btn.data
+    if f.page == "OFFERING" or f.page == "ALCHEMY" or f.page == "CORROSION" then
+        f.selectedMat = f.page == "CORROSION" and f.selectedMat == btn.data and nil or btn.data
     else f.selectedEntry = btn.data.entry; f.selectedLine = nil end
     UI.screens.cube.refresh(f)
 end
 
 local function pickRight(f, btn)
-    if f.page == "EXTRACTION" then f.selectedLine = btn.data else f.selectedMat = btn.data end
+    if f.page == "CORROSION" then
+        f.corrodePick = f.corrodePick or {}
+        f.corrodePick[btn.data] = not f.corrodePick[btn.data] or nil
+        f.selectedMat = nil
+    elseif f.page == "EXTRACTION" then f.selectedLine = btn.data else f.selectedMat = btn.data end
     UI.screens.cube.refresh(f)
 end
 
@@ -617,6 +667,20 @@ local function run(f)
         r, why = Cube.offering(s, f.selectedMat, rng)
         if r then f.result:SetText("기원  " .. resultText(r)) end
         if s.materials[f.selectedMat or 0] == nil then f.selectedMat = nil end
+    elseif f.page == "CORROSION" then
+        local gained, count
+        if f.selectedMat then
+            gained, count = Cube.corrodeMaterial(s, f.selectedMat)
+            if gained then f.result:SetText(Materials.name(f.selectedMat) .. " " .. count .. "개  보급품 +" .. math.floor(gained)) end
+            if s.materials[f.selectedMat] == nil then f.selectedMat = nil end
+        else
+            local list = {}
+            for i in pairs(f.corrodePick or {}) do list[#list + 1] = i end
+            gained, count = Cube.corrode(s, list)
+            if gained then f.result:SetText("장비 " .. count .. "개  보급품 +" .. math.floor(gained)) end
+            f.corrodePick = {}
+        end
+        r, why = gained, count
     elseif f.page == "ALCHEMY" then
         local gold, count = Cube.alchemyMaterial(s, f.selectedMat)
         r, why = gold, count
@@ -641,9 +705,9 @@ local function refresh(f)
     f.expText:SetText(need and (UI.number(c.exp) .. " / " .. UI.number(need)) or "최대 레벨")
     for _, r in ipairs(f.recipes) do
         local recipe = Cube.find(r.kind, (r.kind == "SYNTHESIS" or r.kind == "CRAFTING") and 1 or nil)
-        local open = Cube.unlocked(s, recipe)
+        local open = recipe and Cube.unlocked(s, recipe) or (r.kind == "CORROSION" and Cube.corrosionUnlocked(s))
         r:setSelected(r.kind == f.page)
-        r.right:SetText(open and "" or ("Lv" .. recipe.level))
+        r.right:SetText(open and "" or (recipe and ("Lv" .. recipe.level) or "원정"))
         r.name:SetTextColor(UI.rgb(open and C.text or C.dim))
     end
     f.title:SetText(Cube.NAMES[f.page])
@@ -670,6 +734,7 @@ local function refresh(f)
     elseif f.page == "EXTRACTION" then paintExtraction(f, s)
     elseif f.page == "OFFERING" then paintOffering(f, s)
     elseif f.page == "ALCHEMY" then paintAlchemy(f, s)
+    elseif f.page == "CORROSION" then paintCorrosion(f, s)
     else paintAttach(f, s, f.page) end
 end
 

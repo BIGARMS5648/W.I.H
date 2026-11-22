@@ -596,6 +596,116 @@ T.case("레이드: 스테이지 화면에서 시작하고, 띠가 보스 순번�
     noErrors("레이드 화면")
 end)
 
+T.case("원정·낙스라마스: 스테이지 화면에서 열림 조건, 강도, 보급품, 나가기, 증표", function()
+    local s = App.state
+    local Expeditions, Raids = WIH.Expeditions, WIH.Raids
+    for _, h in pairs(s.heroes) do h.level = 70 end
+    s.stage.cleared[Raids.key(2, 1)] = nil
+    for n = 1, 20 do s.stage.cleared[Expeditions.keys[2][n]] = nil end     -- 앞 검사(유물)가 연 기록을 지운다
+    local f = open("stage")
+    f.tabs[1]:Click("LeftButton")
+    T.ok(not f.expRow:IsShown() and f.specialHint:IsShown(), "일반 난이도에는 원정이 없다는 안내")
+    s.stage.cleared[1310] = 1           -- 일반의 마지막 레이드 → 악몽 탭이 열린다
+    for n = 1, 9 do s.stage.cleared[2100 + n] = 1 end
+    UI.screens.stage.refresh(f)
+    f.tabs[2]:Click("LeftButton")
+    T.eq(f.difficulty, 2)
+    T.ok(f.expRow:IsShown(), "악몽에는 원정 줄이 보임")
+    f.expRow:Click("LeftButton")
+    T.ok(f.name:GetText():find("줄구룹"), f.name:GetText())
+    T.ok(not f.go.enabled and f.state:GetText():find("레이드"), "첫 레이드 전에는 잠김")
+    T.ok(f.intensityRow:IsShown(), "강도 줄이 보임")
+    -- 첫 레이드를 클리어하면 열린다
+    s.stage.cleared[Raids.key(2, 1)] = 1
+    s.supply = 10
+    UI.screens.stage.refresh(f)
+    T.ok(not f.go.enabled and f.state:GetText():find("보급품"), "보급품이 모자라면 못 들어감")
+    s.supply = 60
+    UI.screens.stage.refresh(f)
+    T.ok(f.go.enabled, "들어갈 수 있음")
+    T.ok(not f.intensityBtns[2].enabled, "강도 2는 아직 잠김")
+    T.ok(f.body:GetText():find("강도 1"), "강도의 강화가 보임")
+    f.go:Click("LeftButton")
+    T.eq(s.stage.expedition, Expeditions.keys[2][1])
+    T.ok(App.session.inExpedition, "원정이 바로 시작됨")
+    T.ok(f.leave:IsShown(), "나가기 버튼")
+    Stub.advance(3, 0.05)
+    local found = false
+    for _, child in ipairs(Strip.frame().head.__children) do
+        if child.__kind == "FontString" and (child:GetText() or ""):find("원정") then found = true end
+    end
+    T.ok(found, "띠에 원정이 표시됨")
+    T.ok(s.supply < 60, "원정 중에는 보급품이 줆")
+    -- 강도 1을 클리어한 것으로 두면 강도 2로 옮길 수 있고, 안에서는 보급품 30 조건을 다시 묻지 않는다
+    s.stage.cleared[Expeditions.keys[2][1]] = 1
+    s.supply = 5
+    UI.screens.stage.refresh(f)
+    f.intensityBtns[2]:Click("LeftButton")
+    T.ok(f.go.enabled, "원정 안에서는 강도를 바꿀 수 있음")
+    f.go:Click("LeftButton")
+    T.eq(s.stage.expedition, Expeditions.keys[2][2])
+    f.leave:Click("LeftButton")
+    T.eq(s.stage.expedition, nil, "나가면 던전으로")
+    T.ok(not App.session.inExpedition)
+    -- 낙스라마스: 액트 1 레이드를 클리어해 열렸고, 증표가 있어야 시작
+    f.naxxRows[1]:Click("LeftButton")
+    T.ok(f.name:GetText():find("낙스라마스"))
+    s.materials[Expeditions.NAXX_TOKEN[2]] = nil
+    UI.screens.stage.refresh(f)
+    T.ok(not f.go.enabled and f.state:GetText():find("증표"))
+    s.materials[Expeditions.NAXX_TOKEN[2]] = 1
+    UI.screens.stage.refresh(f)
+    f.go:Click("LeftButton")
+    T.eq(s.stage.raidKey, Expeditions.naxxKeys[2][1])
+    T.ok(App.session.runner.raid ~= nil)
+    T.ok(not f.naxxRows[2].label:GetText():find("잠김"), "줄 이름")
+    -- 던전으로 돌아간다
+    f.tabs[1]:Click("LeftButton")
+    f.rows[101]:Click("LeftButton")
+    f.go:Click("LeftButton")
+    T.eq(s.stage.raidKey, nil)
+    noErrors("원정 화면")
+end)
+
+T.case("큐브 부식: 장비와 역병 열매로 원정 보급품을 채우고, 가득 차면 멈춘다", function()
+    local s = App.state
+    local Cube = WIH.Cube
+    s.stage.cleared[WIH.Raids.key(2, 1)] = 1
+    s.supply = 10
+    s.inventory.items = {}
+    Inventory.add(s, Items.find("AMULET", 1, 3).id)
+    Inventory.add(s, Items.find("HELMET", 1, 3).id)
+    s.materials[150103] = 3
+    local f = open("cube")
+    f.recipes[9]:Click("LeftButton")
+    T.eq(f.page, "CORROSION")
+    T.ok(f.rightList.rows[1]:IsShown() and f.rightList.rows[2]:IsShown(), "장비 목록")
+    f.rightList.rows[1]:Click("LeftButton")
+    f.rightList.rows[2]:Click("LeftButton")
+    T.ok(f.odds:GetText():find("보급품"), f.odds:GetText())
+    f.go:Click("LeftButton")
+    T.eq(#s.inventory.items, 0, "장비 두 개를 씀")
+    T.eq(s.supply, 10 + 12 + 2, "희귀 아뮬렛 12 + 희귀 투구 2(0.8배)")
+    local fruitRow
+    for _, row in ipairs(f.leftList.rows) do if row:IsShown() and row.data == 150103 then fruitRow = row end end
+    T.ok(fruitRow, "역병 열매가 재료 목록에 보임")
+    fruitRow:Click("LeftButton")
+    f.go:Click("LeftButton")
+    T.eq(s.supply, 24 + 3 * 20, "열매 3개 × 20")
+    T.eq(s.materials[150103], nil)
+    s.materials[150103] = 5
+    s.supply = 95
+    UI.screens.cube.refresh(f)
+    for _, row in ipairs(f.leftList.rows) do if row:IsShown() and row.data == 150103 then row:Click("LeftButton") end end
+    f.go:Click("LeftButton")
+    T.eq(s.supply, 100, "최대치에서 멈춤")
+    T.eq(s.materials[150103], 4, "필요한 1개만 씀")
+    UI.screens.cube.refresh(f)
+    T.ok(not f.go.enabled, "가득 차면 버튼이 꺼짐")
+    f.recipes[1]:Click("LeftButton")
+    noErrors("부식")
+end)
+
 T.case("큐브 화면: 해금, 자동 채우기와 합성, 제작, 장식, 기원", function()
     local s = App.state
     local Cube = WIH.Cube

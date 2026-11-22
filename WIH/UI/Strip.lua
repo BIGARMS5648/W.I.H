@@ -63,8 +63,7 @@ end
 
 local function stageLabel(state, runner)
     local key = runner and runner.key or Game.currentStageKey(state)
-    local n = key % 1000
-    return Tables.DIFFICULTY_NAMES[math.floor(key / 1000)] .. " " .. math.floor(n / 100) .. "-" .. (n % 100), App.stageName(key)
+    return App.stageCode(key), App.stageName(key)
 end
 
 local function layout()

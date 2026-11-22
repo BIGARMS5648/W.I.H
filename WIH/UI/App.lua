@@ -19,6 +19,11 @@ App.lastLoot = nil       -- 가장 최근에 얻은 것의 표기
 local LOG_LIMIT = 40
 
 local function stageName(key)
+    local st = WIH.Tables.STAGES[key]
+    if st and st.expedition then
+        return WIH.Expeditions.NAMES[st.expedition.difficulty] .. " 원정 · 강도 " .. st.expedition.intensity
+    end
+    if st and st.naxx then return st.raid.name end
     local n = key % 1000
     if n % 100 == 10 then
         local raid = WIH.Raids.byAct[math.floor(n / 100)]
@@ -28,6 +33,16 @@ local function stageName(key)
     return sec and sec.name or ""
 end
 App.stageName = stageName
+
+-- 짧은 위치 표기: "악몽 1-3", "악몽 원정 7", "지옥 낙스 2"
+function App.stageCode(key)
+    local st = WIH.Tables.STAGES[key]
+    local Tables = WIH.Tables
+    if st and st.expedition then return Tables.DIFFICULTY_NAMES[st.expedition.difficulty] .. " 원정 " .. st.expedition.intensity end
+    if st and st.naxx then return Tables.DIFFICULTY_NAMES[st.naxx.difficulty] .. " 낙스 " .. st.naxx.stage end
+    local n = key % 1000
+    return Tables.DIFFICULTY_NAMES[math.floor(key / 1000)] .. " " .. math.floor(n / 100) .. "-" .. (n % 100)
+end
 
 function App.addLog(line)
     local log = App.log
