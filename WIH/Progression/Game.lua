@@ -47,6 +47,7 @@ function Game.new(faction, starter, now)
     WIH.Inventory.ensure(state)
     WIH.Chests.ensure(state)
     WIH.Pets.ensure(state)
+    if WIH.Relics then WIH.Relics.ensure(state) end
     WIH.Cube.ensure(state)
     WIH.Expeditions.ensure(state)
     return state

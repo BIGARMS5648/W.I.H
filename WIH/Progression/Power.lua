@@ -50,7 +50,16 @@ local function signature(state, heroId, stageKey)
     for _, slot in ipairs(WIH.Items.SLOTS) do
         local entry = h.gear and h.gear[slot]
         parts[#parts + 1] = entry and entry.id or 0
+        if entry and entry.added then
+            for _, a in ipairs(entry.added) do parts[#parts + 1] = a.stat .. "=" .. a.value end
+        end
     end
+    if WIH.Pets then
+        local owned = 0
+        for _, pet in ipairs(WIH.Pets.list) do if WIH.Pets.owned(state, pet.id) then owned = owned + 1 end end
+        parts[#parts + 1] = "p" .. owned
+    end
+    if WIH.Relics then parts[#parts + 1] = WIH.Relics.signature(state) end
     local runes = 0
     for key, level in pairs(state.runes or {}) do runes = runes + key * level end
     parts[#parts + 1] = runes

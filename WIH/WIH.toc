@@ -49,6 +49,8 @@ Data\Runes.lua
 Progression\Runes.lua
 Stage\Session.lua
 Progression\Pets.lua
+Data\RelicTable.lua
+Progression\Relics.lua
 Progression\Power.lua
 Progression\Offline.lua
 Save\Save.lua

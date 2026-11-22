@@ -216,6 +216,9 @@ Chests.MATERIAL_KIND = MATERIAL_KIND
 -- 상자를 연 결과의 한 줄 표기
 function Chests.resultText(result)
     if not result then return "" end
+    if result.relic then
+        return WIH.Relics.name(result.relic) .. " [" .. Items.GRADES[result.relic.grade].name .. "]"
+    end
     if result.item then
         local where = result.where == "mail" and " (가방이 가득 차 임시 보관함으로)" or ""
         return Items.name(result.item) .. " [" .. Items.gradeName(result.item) .. "]" .. where

@@ -515,16 +515,31 @@ local function paintMaterialList(f, s, filter, label, right)
     return #ids
 end
 
-local function paintOffering(f, s)
+local function offeringFees(s)
     local fees = {}
     for _, r in ipairs(Cube.recipes) do if r.kind == "OFFERING" then fees[r.material] = r.fee end end
+    for id in pairs(s.materials) do
+        if WIH.Relics.isOfferMaterial(id) then fees[id] = WIH.Relics.OFFER_FEE end
+    end
+    return fees
+end
+
+local function paintOffering(f, s)
+    local fees = offeringFees(s)
     local n = paintMaterialList(f, s, function(id) return fees[id] ~= nil end, "공물 주화", function(id) return "수수료 " .. UI.number(fees[id]) .. " G" end)
     f.odds:Show()
     f.odds:ClearAllPoints()
     f.odds:SetPoint("TOPLEFT", 318, -22)
     f.odds:SetPoint("TOPRIGHT", 0, -22)
     local lines = {}
-    if f.selectedMat then
+    if f.selectedMat and WIH.Relics.isOfferMaterial(f.selectedMat) then
+        local odds = {}
+        for g, p in pairs(WIH.Relics.offerOdds(f.selectedMat)) do odds[#odds + 1] = { g, p } end
+        table.sort(odds, function(a, b) return a[1] < b[1] end)
+        local quiver = math.floor(f.selectedMat / 1000) == 161
+        lines[#lines + 1] = (quiver and "유물함" or "유물") .. " 등급  " .. oddsText(odds, GRADE_TEXT)
+        lines[#lines + 1] = "결과는 성장 → 유물에서 장착합니다." .. (quiver and "\n이 애드온에 옮기지 않은 공명 효과의 유물함은 나오지 않습니다." or "")
+    elseif f.selectedMat then
         for _, r in ipairs(Cube.recipes) do
             if r.material == f.selectedMat then
                 local g, l = craftOdds(r.table)

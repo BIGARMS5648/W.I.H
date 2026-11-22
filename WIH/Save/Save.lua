@@ -167,6 +167,7 @@ function Save.validate(state)
     WIH.Pets.validate(state)
     WIH.Cube.validate(state)
     WIH.Expeditions.validate(state)
+    WIH.Relics.validate(state)
 
     local party, seen = {}, {}
     if type(state.party) == "table" then

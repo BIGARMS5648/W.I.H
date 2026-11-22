@@ -90,6 +90,7 @@ function S:startStage()
         onEvent = function(ev, a, b, c, d, e, f, g) self:onRunnerEvent(ev, a, b, c, d, e, f, g) end,
     })
     self.runner.relayBattle = self.relayBattle
+    WIH.Relics.install(self.runner.battle, self.runner.heroes, state)
     self.stageKey = key
     self.wait = 0
     self:emit("stageStart", key, self.runner)

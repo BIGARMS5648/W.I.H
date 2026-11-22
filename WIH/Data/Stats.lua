@@ -88,6 +88,16 @@ def("MovementSpeed", 1, 0, "이동속도")
 def("IncreaseExpAmount", 1000, 1000, "경험치 획득")
 def("AdditionalExp", 1, 0, "처치당 추가 경험치")
 
+-- 유물이 주는 능력치 [원작 1.3.0]
+def("BossDamage", 1000, 0, "보스에게 주는 피해")
+def("FullHpTargetDamage", 1000, 0, "체력이 가득한 적에게 주는 피해")
+def("LowHpTargetDamage", 1000, 0, "체력이 낮은 적에게 주는 피해")
+def("FullHpTargetCriticalChance", 1000, 0, "체력이 가득한 적 대상 치명타 확률")
+def("LowHpDamageReduction", 1000, 0, "체력이 낮을 때 받는 피해 감소")
+def("CrowdControlDurationReduction", 1000, 0, "행동 불가 지속시간 감소")
+def("ReviveCooldownReduction", 1000, 0, "부활 대기시간 감소")
+def("OnReviveAttackDamage", 1000, 0, "부활 직후 공격력")
+
 -- 상한 [원작 / 추정]. 값은 실제 단위.
 Stats.CAP_CRIT = 1.0
 Stats.CAP_COOLDOWN_REDUCTION = 0.75

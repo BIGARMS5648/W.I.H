@@ -153,6 +153,7 @@ function B:applyStatus(src, dst, name, durMult)
     if def.cc then
         if dst.isBoss then dur = dur * 0.5 end                      -- [독자] 보스는 행동 불가 지속 절반
         if dst.ccReduction then dur = dur * (1 - dst.ccReduction) end
+        if dst.team == 1 then dur = dur * (1 - math.min(0.75, dst:get("CrowdControlDurationReduction"))) end
     end
     if old then
         if def.reapply == "ignore" then return old end
@@ -218,10 +219,16 @@ function B:hit(src, dst, spec)
     end
     dmg = dmg * off:get("DamageDealt")
     if spec.mult then dmg = dmg * spec.mult end
+    -- 대상의 상태에 따른 피해 증가(유물) [원작 1.3.0 / 추정: 체력이 낮다 = 50% 이하]
+    local fullHp = dst.hp >= dst:get("MaxHp") * 0.999
+    if dst.isBoss then dmg = dmg * (1 + off:get("BossDamage")) end
+    if fullHp then dmg = dmg * (1 + off:get("FullHpTargetDamage"))
+    elseif dst:hpRatio() <= 0.5 then dmg = dmg * (1 + off:get("LowHpTargetDamage")) end
 
     local crit = false
     if not spec.isDot and spec.canCrit ~= false then
         local chance = off:get("CriticalChance")
+        if fullHp then chance = chance * (1 + off:get("FullHpTargetCriticalChance")) end
         if spec.critChanceMult then
             chance = chance * spec.critChanceMult
             if chance > 1 then chance = 1 end
@@ -285,6 +292,7 @@ function B:receive(src, dst, dmg, elem, spec, crit)
     end
 
     dmg = dmg * (1 - dst:get("DamageReduction"))
+    if dst.team == 1 and dst:hpRatio() <= 0.5 then dmg = dmg * (1 - dst:get("LowHpDamageReduction")) end
     local elemReduction = dst:get(elem .. "DamageReduction")
     if elemReduction > Stats.CAP_DAMAGE_REDUCTION then elemReduction = Stats.CAP_DAMAGE_REDUCTION end
     dmg = dmg * (1 - elemReduction)
@@ -477,6 +485,10 @@ function B:revive(dst, hpPct)
     dst.ccImmune = false
     dst.nextHit = nil
     self.auraTimer = 0
+    local bonus = dst:get("OnReviveAttackDamage")
+    if bonus > 0 then       -- 부활 직후 10초 동안 공격력 증가(유물) [추정: 지속시간]
+        self:addEffect(dst, { id = "reviveFury", kind = "buff", dur = 10, mods = { { "AttackDamage", 2, bonus * 1000 } } })
+    end
     self:emit("revive", dst)
     runTriggers(self, dst, "onRevive")
     return true
@@ -626,7 +638,8 @@ function B:step()
                     self:emit("expire", u)
                 end
             end
-        elseif u and u.kind == "hero" and self.autoRevive and u.diedAt and now - u.diedAt >= self.reviveDelay then
+        elseif u and u.kind == "hero" and self.autoRevive and u.diedAt
+            and now - u.diedAt >= self.reviveDelay * (1 - math.min(0.75, u:get("ReviveCooldownReduction"))) then
             self:revive(u)
         end
     end

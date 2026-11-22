@@ -418,6 +418,13 @@ end
 ------------------------------------------------------------------------
 
 function Cube.offering(state, coinId, rng)
+    if WIH.Relics and WIH.Relics.isOfferMaterial(coinId) then
+        if not Cube.unlocked(state, Cube.find("OFFERING")) then return fail("기원 레시피가 열리지 않았습니다.") end
+        local result, why = WIH.Relics.offerMaterial(state, coinId, rng)
+        if not result then return fail(why) end
+        result.ups = Cube.addExp(state, Cube.materialExp(state, coinId))
+        return result
+    end
     local recipe
     for _, r in ipairs(Cube.recipes) do if r.kind == "OFFERING" and r.material == coinId then recipe = r end end
     if not recipe then return fail("기원에 쓸 수 없는 재료입니다.") end

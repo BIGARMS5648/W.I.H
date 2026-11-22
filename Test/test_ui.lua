@@ -438,6 +438,89 @@ T.case("성장 화면(룬): 구매가 골드와 룬 레벨에 반영된다", fun
     noErrors("성장 화면")
 end)
 
+T.case("성장 화면(유물): 기원으로 얻고, 장착하고, 칸에 끼워 공명시키고, 조율·적용한다", function()
+    local s = App.state
+    local Relics, Cube, Rng = WIH.Relics, WIH.Cube, WIH.Rng
+    s.gold = 1e8
+    local f = open("runes")
+    local function seg(segment, id)
+        for _, b in ipairs(segment.buttons) do if b.id == id then b:Click("LeftButton") end end
+    end
+    seg(f.seg, "relic")
+    local v = f.relicView
+    T.ok(v:IsShown(), "유물 화면이 보임")
+    T.ok(v.summary:GetText():find("원정"), "잠겨 있으면 여는 방법을 안내")
+    T.ok(not v.qName:IsShown() and v.qEmpty:IsShown(), "유물함이 없으면 안내 문구")
+    noErrors("유물 화면(빈 상태)")
+    -- 원정 클리어 → 1칸. 큐브 기원으로 유물함을 얻는다.
+    s.stage.cleared[WIH.Expeditions.keys[2][1]] = 1
+    s.cube.level = 40
+    if not Cube.unlocked(s, Cube.find("OFFERING")) then T.ok(Cube.unlock(s, Cube.find("OFFERING"))) end
+    s.materials[161005] = 1
+    local cube = open("cube")
+    cube.recipes[7]:Click("LeftButton")
+    local found
+    for _, row in ipairs(cube.leftList.rows) do if row:IsShown() and row.data == 161005 then found = row end end
+    T.ok(found, "기원 목록에 오염된 유물함이 보임")
+    found:Click("LeftButton")
+    T.ok(cube.odds:GetText():find("유물함 등급"), "유물함 등급 확률이 보임")
+    cube.go:Click("LeftButton")
+    T.eq(s.materials[161005], nil, "재료를 씀")
+    T.ok(cube.result:GetText():find("유물함"), "결과: " .. cube.result:GetText())
+    local q = Relics.list(s, "RELIQUARY")[1]
+    T.ok(q and q.grade >= 5)
+    cube.recipes[1]:Click("LeftButton")       -- 큐브 화면을 처음 페이지로 돌려 둔다
+    -- 시험을 위해 힘의 유물함(빨강 3)으로 바꾸고 빨간 유물 3개를 준다
+    local might = Relics.makeReliquary(s, 790008, 6, Rng.new(2))
+    for i = 1, #might.slots do might.slots[i] = "RED" end
+    for _ = 1, 3 do Relics.makeRelic(s, 710001, 6, Rng.new(4)) end
+    f = open("runes")
+    seg(f.seg, "relic")
+    v = f.relicView
+    T.ok(v.summary:GetText():find("유물함 칸 1 / 2"))
+    -- 목록에서 힘의 유물함을 고른다
+    local row
+    for _, r in ipairs(v.rows) do if r:IsShown() and r.item == might then row = r end end
+    T.ok(row, "목록에 유물함이 보임")
+    row:Click("LeftButton")
+    T.eq(v.quiver, might.uid)
+    T.ok(v.qName:GetText():find("힘"), v.qName:GetText())
+    T.ok(not v.eq2.enabled, "2번째 칸은 잠김")
+    v.eq1:Click("LeftButton")
+    T.eq(s.relics.equipped[1], might.uid, "칸 1에 장착")
+    T.ok(v.apply.enabled, "바꾸면 지금 적용이 켜짐")
+    -- 유물 목록에서 하나 골라 칸에 끼운다
+    seg(v.kindSeg, "RELIC")
+    local relicRow
+    for _, r in ipairs(v.rows) do if r:IsShown() and r.item and r.item.kind == "RELIC" then relicRow = r; break end end
+    relicRow:Click("LeftButton")
+    T.ok(v.pick ~= nil and v.pInfo:IsShown(), "고른 유물의 정보")
+    v.sockets[1]:Click("LeftButton")
+    T.eq(might.sockets[1] ~= nil, true, "칸에 끼움")
+    -- 나머지는 자동 끼우기
+    v.fill:Click("LeftButton")
+    T.ok(Relics.resonating(s, might), "빨강 3개로 공명")
+    T.ok(v.totals:GetText():find("힘의 축복"), "발동 중인 공명이 합계에 보임: " .. v.totals:GetText())
+    -- 오른쪽 클릭으로 빼기
+    v.sockets[2]:Click("RightButton")
+    T.eq(might.sockets[2], nil)
+    T.ok(not Relics.resonating(s, might))
+    -- 조율
+    local gold = s.gold
+    v.qAttune:Click("LeftButton")
+    T.ok(s.gold < gold, "조율 비용을 냄")
+    T.eq(might.attune, 1)
+    -- 적용: 전투 영웅에게 들어간다
+    v.fill:Click("LeftButton")
+    v.apply:Click("LeftButton")
+    T.ok(not v.apply.enabled)
+    noErrors("유물 화면")
+    -- 펫·룬으로 돌아가도 오류가 없다
+    seg(f.seg, "pet"); seg(f.seg, "rune")
+    T.ok(not v:IsShown())
+    noErrors("성장 화면 전환")
+end)
+
 T.case("편성 화면: 넣기, 순서 바꾸기, 빼기", function()
     local s = App.state
     local f = open("party")

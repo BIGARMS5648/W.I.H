@@ -167,6 +167,7 @@ end
 function Runes.totals(state)
     local totals = Runes.ownTotals(state)
     if WIH.Pets then WIH.Pets.addTotals(state, totals) end
+    if WIH.Relics then WIH.Relics.addTotals(state, totals) end
     return totals
 end
 
@@ -195,6 +196,7 @@ function Runes.sheet(state)
     add("MovementSpeed", Stats.INC, totals.AllHeroMoveSpeed)
     add("IncreaseExpAmount", Stats.INC, totals.IncreaseExpAmount)
     add("AdditionalExp", Stats.FLAT, totals.AdditionalExp)
+    if WIH.Relics then Sheet.merge(sheet, WIH.Relics.sheet(state)) end    -- 유물: 파티 전원 [원작]
     return sheet, totals
 end
 
