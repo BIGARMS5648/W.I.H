@@ -9,6 +9,7 @@
 Core\Init.lua
 Core\Rng.lua
 Data\Stats.lua
+Data\Tables.lua
 Combat\Sheet.lua
 Combat\Unit.lua
 Combat\Battle.lua
@@ -22,3 +23,4 @@ Data\Skills_Rogue_Priest_Shaman.lua
 Data\Skills_Mage_Warlock_Druid_Tinker.lua
 Data\SkillTools.lua
 Progression\HeroBuild.lua
+Progression\Level.lua

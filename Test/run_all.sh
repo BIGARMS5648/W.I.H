@@ -7,5 +7,6 @@ done
 echo "문법 검사: 통과"
 lua5.1 Test/test_engine.lua
 lua5.1 Test/test_heroes.lua
+lua5.1 Test/test_progression.lua
 lua5.1 Test/wih_load_test.lua
 lua5.1 Test/envcheck_load_test.lua
