@@ -39,6 +39,7 @@ function Game.new(faction, starter, now)
         heroes = { [starter] = newHero(starter) },
         party = { starter },
         unlocks = { partySlots = Game.BASE_PARTY_SLOTS, skillSlots = Game.BASE_SKILL_SLOTS },
+        runes = {},
         stage = { difficulty = 1, section = 101, cleared = {}, bossIndex = {} },
         settings = { autoRetry = true, repeatMode = false, autoAdvance = true },
         stats = { kills = 0, bossKills = 0, clears = 0, fails = 0, goldEarned = 0, playSeconds = 0 },

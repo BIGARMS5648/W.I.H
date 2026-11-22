@@ -137,8 +137,15 @@ function Save.validate(state)
     if count == 0 then return nil end
 
     if type(state.unlocks) ~= "table" then state.unlocks = {} end
-    state.unlocks.partySlots = clampInt(state.unlocks.partySlots, Game.BASE_PARTY_SLOTS, Game.MAX_PARTY_SLOTS, Game.BASE_PARTY_SLOTS)
-    state.unlocks.skillSlots = clampInt(state.unlocks.skillSlots, Game.BASE_SKILL_SLOTS, Game.MAX_SKILL_SLOTS, Game.BASE_SKILL_SLOTS)
+    local Runes = WIH.Runes
+    if Runes then
+        local fixedRunes = Runes.validate(state)
+        if fixedRunes > 0 then notes[#notes + 1] = "룬 기록 " .. fixedRunes .. "건을 바로잡음" end
+        Runes.apply(state)       -- 편성 칸과 스킬 칸은 룬에서 다시 계산한다
+    else
+        state.unlocks.partySlots = clampInt(state.unlocks.partySlots, Game.BASE_PARTY_SLOTS, Game.MAX_PARTY_SLOTS, Game.BASE_PARTY_SLOTS)
+        state.unlocks.skillSlots = clampInt(state.unlocks.skillSlots, Game.BASE_SKILL_SLOTS, Game.MAX_SKILL_SLOTS, Game.BASE_SKILL_SLOTS)
+    end
     for _, h in pairs(state.heroes) do
         while #h.bar > state.unlocks.skillSlots do table.remove(h.bar) end
     end

@@ -36,9 +36,14 @@ function S:startStage()
     local state = self.state
     local key = Game.currentStageKey(state)
     self.runs = self.runs + 1
+    -- 계정 공통 수정치: 룬(+ 시험용으로 밖에서 넣은 시트)
+    local account, totals = WIH.Runes.sheet(state)
+    if self.account then WIH.Sheet.merge(account, self.account) end
+    self.runeTotals = totals
     self.runner = Runner.new({
         difficulty = state.stage.difficulty, section = state.stage.section,
-        seed = self.seed + self.runs * 7919, party = Game.buildParty(state), account = self.account,
+        waveReduction = totals.WaveCountReduction or 0,
+        seed = self.seed + self.runs * 7919, party = Game.buildParty(state), account = account,
         bossIndex = state.stage.bossIndex[key] or 1, tuning = self.tuning,
         onEvent = function(ev, a, b, c) self:onRunnerEvent(ev, a, b, c) end,
     })
@@ -54,7 +59,10 @@ function S:onRunnerEvent(ev, a, b, c)
         local reward = b
         state.stats.kills = state.stats.kills + 1
         if a.isBoss then state.stats.bossKills = state.stats.bossKills + 1 end
-        Game.addGold(state, reward.gold)
+        local kind = a.isBoss and "boss" or "normal"
+        local totals = self.runeTotals or {}
+        Game.addGold(state, WIH.Runes.goldFor(totals, reward.gold, kind))
+        local extraExp = WIH.Runes.extraExpFor(totals, kind)
         local runner = self.runner
         local stageLevel = runner.stage.level
         for rank, u in ipairs(runner.heroes) do
@@ -62,8 +70,9 @@ function S:onRunnerEvent(ev, a, b, c)
                 local heroId = state.party[rank]
                 local h = state.heroes[heroId]
                 if h then
-                    local gain = reward.exp * Level.expPenalty(h.level, stageLevel) * u:get("IncreaseExpAmount")
-                        + u:get("AdditionalExp")
+                    -- (기본 + 고정 추가) × 경험치 획득 % × 레벨 차 페널티 [독자: 적용 순서는 원작에서 확인되지 않음]
+                    local gain = (reward.exp + extraExp + u:get("AdditionalExp")) * u:get("IncreaseExpAmount")
+                        * Level.expPenalty(h.level, stageLevel)
                     local ups = Game.addExp(state, heroId, gain)
                     if ups > 0 then self:emit("levelUp", heroId, h.level) end
                 end

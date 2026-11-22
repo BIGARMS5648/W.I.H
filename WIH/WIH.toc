@@ -28,5 +28,7 @@ Data\Monsters.lua
 Data\Dungeons.lua
 Stage\Runner.lua
 Progression\Game.lua
+Data\Runes.lua
+Progression\Runes.lua
 Stage\Session.lua
 Save\Save.lua

@@ -218,7 +218,8 @@ T.case("저장: 망가진 값을 고치고 무엇을 고쳤는지 보고한다",
     T.eq(state.heroes.ghost_hero, nil)
     T.eq(state.heroes.war_prot, nil)
     T.eq(#state.party, 1); T.eq(state.party[1], "mag_fire")
-    T.eq(state.unlocks.partySlots, 5); T.eq(state.unlocks.skillSlots, 2)
+    -- 편성 칸과 스킬 칸은 저장된 값이 아니라 룬에서 다시 계산한다(룬이 없으므로 기본값).
+    T.eq(state.unlocks.partySlots, 1); T.eq(state.unlocks.skillSlots, 2)
     T.eq(Game.currentStageKey(state), 1101)
     T.eq(state.stage.cleared[42], nil)
     T.eq(state.settings.autoRetry, true)
