@@ -78,7 +78,14 @@ function methods:SetScrollChild(c) self.__scrollChild = c end
 function methods:SetTexture(path) self.__texture = path; return true end
 function methods:GetTexture() return self.__texture end
 -- 모델: Stub.modelsWork가 참이면 불러와진 것으로, Stub.badModels[번호]가 있으면 그 번호만 실패로 친다.
-function methods:SetCreature(id) self.__creature = id end
+function methods:SetCreature(id) self.__creature = id; self.__worn = nil end
+function methods:SetDisplayInfo(id) self.__creature = id; self.__display = id end
+function methods:GetDisplayInfo() return self.__creature and (self.__creature + 500000) or 0 end
+-- 옷 입히기(DressUpModel). Stub.noDress가 참이면 이 함수들이 없는 클라이언트를 흉내 낸다.
+function methods:SetCustomRace(race, sex) self.__creature = 900000 + race * 10 + (sex or 0); self.__worn = {} end
+function methods:Undress() self.__worn = {} end
+function methods:TryOn(link, hand) self.__worn = self.__worn or {}; self.__worn[#self.__worn + 1] = link .. (hand and ("@" .. hand) or "") end
+function methods:SetSheathed(v) self.__sheathed = v end
 function methods:ClearModel() self.__creature = nil end
 function methods:GetModelFileID()
     if not Stub.modelsWork or not self.__creature then return nil end
@@ -114,6 +121,7 @@ end
 
 -- 정의하지 않은 메서드는 아무 일도 하지 않고 nil을 돌려주는 함수가 된다.
 widgetMeta.__index = function(self, key)
+    if Stub.noDress and (key == "SetCustomRace" or key == "TryOn" or key == "Undress" or key == "SetSheathed") then return nil end
     local m = methods[key]
     if m then return m end
     -- 위젯 API의 이름은 대문자로 시작한다. 그 밖의 키는 애드온이 프레임에 붙인 자기 필드이므로 실제처럼 nil이다.

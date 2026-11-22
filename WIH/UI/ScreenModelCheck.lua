@@ -10,6 +10,8 @@ local Monsters = WIH.module("Monsters")
 local Dungeons = WIH.module("Dungeons")
 local Raids = WIH.module("Raids")
 local Models = WIH.module("Models")
+local Looks = WIH.module("Looks")
+local Game = WIH.module("Game")
 
 local C = UI.C
 local COLS, ROWS = 6, 2
@@ -18,7 +20,30 @@ local PER_PAGE = COLS * ROWS
 -- 점검할 목록: { name = 이름, ids = 후보 번호 목록 }
 local function buildList(kind, faction)
     local list = {}
-    if kind == "hero" then
+    if kind == "look" then
+        -- 직업마다 겉모습 단계 여섯 개를 한 벌씩 입혀 본다(그 직업의 첫 영웅의 종족과 무기로).
+        for _, class in ipairs(Heroes.CLASS_ORDER) do
+            local sample
+            for _, hero in ipairs(Heroes.list) do
+                if hero.class == class and not hero.forms then sample = sample or hero end
+            end
+            local pair = Looks.RACE[sample.id][faction == "Horde" and 2 or 1]
+            for tier = 1, 6 do
+                local set = Looks.set(class, tier)
+                local items = {}
+                for _, slot in ipairs({ "chest", "shoulder", "legs", "head", "hands", "feet" }) do
+                    if set[slot] then items[#items + 1] = set[slot] end
+                end
+                if Looks.WEAPONS[sample.main] then items[#items + 1] = Looks.WEAPONS[sample.main][tier] end
+                local offhand
+                if Looks.WEAPONS[sample.sub] then
+                    if Looks.OFFHAND_WEAPON[sample.sub] then offhand = Looks.WEAPONS[sample.sub][tier] else items[#items + 1] = Looks.WEAPONS[sample.sub][tier] end
+                end
+                list[#list + 1] = { name = Heroes.CLASSES[class] .. " · " .. Looks.TIER_NAMES[tier],
+                    look = { race = pair[1], sex = pair[2], items = items, offhand = offhand }, ids = {} }
+            end
+        end
+    elseif kind == "hero" then
         for _, hero in ipairs(Heroes.list) do
             list[#list + 1] = { name = hero.name, ids = Models.heroCandidates(hero.id, faction) }
             if hero.forms then
@@ -48,10 +73,10 @@ end
 
 local function create(parent)
     local f = CreateFrame("Frame", nil, parent)
-    f.kind, f.page = "hero", 1
+    f.kind, f.page = "look", 1
     f.kinds = {}
     local x = 14
-    for _, it in ipairs({ { "hero", "영웅" }, { "boss", "보스" }, { "mob", "일반 몬스터" } }) do
+    for _, it in ipairs({ { "look", "장비 룩" }, { "hero", "영웅(고정 모델)" }, { "boss", "보스" }, { "mob", "일반 몬스터" } }) do
         local b = UI.chip(f, it[2], function()
             f.kind, f.page = it[1], 1
             UI.screens.modelcheck.refresh(f)
@@ -63,13 +88,21 @@ local function create(parent)
     end
     f.info = UI.text(f, 11, C.sub)
     f.info:SetPoint("TOPLEFT", x + 12, -17)
+    f.diag = UI.text(f, 11, C.dim)
+    f.diag:SetPoint("BOTTOMLEFT", 14, 4)
     local back = UI.button(f, "설정으로", 76, 24, function() WIH.Main.show("settings") end)
     back:SetPoint("TOPRIGHT", -14, -10)
+    local retry = UI.button(f, "다시 시도", 70, 24, function()
+        Models.resetKnown()
+        UI.screens.modelcheck.refresh(f)
+    end)
+    retry:SetPoint("RIGHT", back, "LEFT", -8, 0)
+    retry.tooltip = { title = "다시 시도", lines = { "실패로 기억해 둔 모델을 지우고 처음부터 다시 불러옵니다." } }
     f.nextBtn = UI.button(f, "다음", 56, 24, function()
         f.page = f.page + 1
         UI.screens.modelcheck.refresh(f)
     end)
-    f.nextBtn:SetPoint("RIGHT", back, "LEFT", -8, 0)
+    f.nextBtn:SetPoint("RIGHT", retry, "LEFT", -8, 0)
     f.prevBtn = UI.button(f, "이전", 56, 24, function()
         f.page = math.max(1, f.page - 1)
         UI.screens.modelcheck.refresh(f)
@@ -80,8 +113,8 @@ local function create(parent)
     for i = 1, PER_PAGE do
         local col, row = (i - 1) % COLS, math.floor((i - 1) / COLS)
         local cell = UI.panel(f, C.panel, true)
-        cell:SetSize(148, 232)
-        cell:SetPoint("TOPLEFT", 14 + col * 155, -46 - row * 240)
+        cell:SetSize(148, 226)
+        cell:SetPoint("TOPLEFT", 14 + col * 155, -44 - row * 232)
         cell.view = UI.modelView(cell)
         cell.view:SetPoint("TOPLEFT", 4, -4)
         cell.view:SetPoint("BOTTOMRIGHT", -4, 44)
@@ -105,7 +138,7 @@ local function refresh(f)
     local list = buildList(f.kind, s.faction)
     local pages = math.max(1, math.ceil(#list / PER_PAGE))
     if f.page > pages then f.page = pages end
-    f.info:SetText(string.format("%d개 중 %d ~ %d   ·   %d / %d쪽   ·   번호가 붉으면 그 번호의 모델이 나오지 않은 것입니다.", #list,
+    f.info:SetText(string.format("%d개 중 %d ~ %d   ·   %d / %d쪽", #list,
         (f.page - 1) * PER_PAGE + 1, math.min(#list, f.page * PER_PAGE), f.page, pages))
     f.prevBtn:setEnabled(f.page > 1)
     f.nextBtn:setEnabled(f.page < pages)
@@ -115,23 +148,42 @@ local function refresh(f)
         if entry then
             cell.entry, cell.failed = entry, nil
             cell.name:SetText(entry.name)
-            if #entry.ids == 0 or not cell.view:setCreature(entry.ids, 0.4, 1.2) then cell.failed = true end
+            if entry.look then
+                if not cell.view:setCharacter(entry.look, 0.4, 1.2) then cell.failed = true end
+            elseif #entry.ids == 0 or not cell.view:setCreature(entry.ids, 0.4, 1.2) then
+                cell.failed = true
+            end
         else
             cell.view:clear()
         end
     end
 end
 
+-- 진단 줄: 옷 입히기에 쓰는 함수가 이 클라이언트에 있는지, 호출이 성공했는지
+local function diagText()
+    local d = Models.dressInfo
+    local function yes(v) return v == nil and "?" or (v and "됨" or "안 됨") end
+    local state = Models.dress == nil and "확인 중" or (Models.dress and "됨" or "안 됨(고정 모델로 대체)")
+    return string.format("장비 룩 진단   프레임 %s  ·  SetCustomRace %s(호출 %s)  ·  TryOn %s(입힌 수 %s)  ·  Undress %s  ·  SetSheathed %s  ·  결과: %s   |   붉은 번호 = 나오지 않은 모델",
+        tostring(d.frame or "?"), d.hasRace == nil and "?" or (d.hasRace and "있음" or "없음"), yes(d.race),
+        d.hasTryOn == nil and "?" or (d.hasTryOn and "있음" or "없음"), tostring(d.tryOn or "?"), yes(d.undress), yes(d.sheath), state)
+end
+
 local function update(f, elapsed)
+    f.diag:SetText(diagText())
     for _, cell in ipairs(f.cells) do
         if cell:IsShown() and cell.entry then
             cell.view:update(elapsed)
+            if cell.entry.look then
+                local n = #cell.entry.look.items + (cell.entry.look.offhand and 1 or 0)
+                cell.state:SetText(cell.failed and "|cffcf5f58입히기 실패|r" or (cell.view:isPending() and "불러오는 중" or ("|cff6fb07f아이템 " .. n .. "개|r")))
+            end
             local parts = {}
             for _, id in ipairs(cell.entry.ids) do
                 local known = Models.known[id]
                 parts[#parts + 1] = (known == false and "|cffcf5f58" or (known == true and "|cff6fb07f" or "|cff9da2aa")) .. id .. "|r"
             end
-            cell.state:SetText(#parts > 0 and table.concat(parts, " → ") or "지정한 모델 없음")
+            if not cell.entry.look then cell.state:SetText(#parts > 0 and table.concat(parts, " → ") or "지정한 모델 없음") end
         end
     end
 end

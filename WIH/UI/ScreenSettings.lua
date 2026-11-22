@@ -148,11 +148,16 @@ local function create(parent)
         o.models = not o.models
         if WIH.Main.built.heroes then WIH.Main.built.heroes.modelKey = nil end
     end)
+    f.optLooks = opt("장비 룩", 76, "영웅이 낀 장비대로 옷과 무기를 입은 모습으로 보여 줍니다. 끄면 직업별 고정 모델을 씁니다.", function()
+        local o = WIH.Scene.options()
+        o.looks = not (o.looks ~= false)
+        if WIH.Strip.scene then WIH.Strip.scene.battle = nil end
+    end)
     f.optFlip = opt("방향 뒤집기", 96, "모델이 반대쪽을 보고 있을 때 켭니다(영웅은 오른쪽, 적은 왼쪽을 봐야 합니다).", function()
         local o = WIH.Scene.options()
         o.modelFlip = not o.modelFlip
     end)
-    f.optLimit = opt("", 96, "전투 장면에서 모델로 보여 줄 수의 상한입니다. 영웅과 보스는 늘 모델로 보여 주고, 나머지 적은 이 수까지만 모델로 보여 줍니다. 화면이 끊기면 낮추세요.", function()
+    f.optLimit = opt("", 86, "전투 장면에서 모델로 보여 줄 수의 상한입니다. 영웅과 보스는 늘 모델로 보여 주고, 나머지 적은 이 수까지만 모델로 보여 줍니다. 화면이 끊기면 낮추세요.", function()
         local o = WIH.Scene.options()
         local steps = { 4, 8, 12, 20, 30 }
         local nextValue = steps[1]
@@ -162,16 +167,16 @@ local function create(parent)
         o.modelLimit = nextValue
         if WIH.Strip.scene then WIH.Strip.scene.battle = nil end      -- 장면을 다시 꾸민다
     end)
-    f.optStrip = opt("", 96, "사냥 띠를 숨기거나 다시 보입니다. 숨겨도 사냥은 계속됩니다. 채팅창에 /wih 띠 를 입력해도 됩니다.", function()
+    f.optStrip = opt("", 86, "사냥 띠를 숨기거나 다시 보입니다. 숨겨도 사냥은 계속됩니다. 채팅창에 /wih 띠 를 입력해도 됩니다.", function()
         WIH.Strip.toggleHidden()
     end)
-    f.optLock = opt("", 96, "사냥 띠를 끌어서 옮기거나 폭을 바꾸지 못하게 고정합니다.", function()
+    f.optLock = opt("", 92, "사냥 띠를 끌어서 옮기거나 폭을 바꾸지 못하게 고정합니다.", function()
         WIH.Strip.setLocked(not WIH.Strip.saved().locked)
     end)
-    opt("띠 위치 초기화", 106, "사냥 띠를 처음 자리(화면 아래 가운데)와 처음 폭으로 되돌립니다.", function()
+    opt("띠 위치 초기화", 100, "사냥 띠를 처음 자리(화면 아래 가운데)와 처음 폭으로 되돌립니다.", function()
         WIH.Strip.resetPlace()
     end)
-    opt("모델 점검", 86, "영웅과 몬스터의 모델이 제대로 나오는지 한눈에 봅니다. 잘못 나오는 것을 알려 주시면 고칩니다.", function()
+    opt("모델 점검", 76, "영웅과 몬스터의 모델이 제대로 나오는지 한눈에 봅니다. 잘못 나오는 것을 알려 주시면 고칩니다.", function()
         WIH.Main.show("modelcheck")
     end)
 
@@ -224,6 +229,7 @@ local function refresh(f)
     local o = WIH.Scene.options()
     f.optModels:setSelected(o.models)
     f.optFlip:setSelected(o.modelFlip == true)
+    f.optLooks:setSelected(o.looks ~= false)
     f.optLimit:setText("모델 수 " .. o.modelLimit)
     f.optStrip:setText(WIH.Strip.saved().hidden and "띠 보이기" or "띠 숨기기")
     f.optLock:setText(WIH.Strip.saved().locked and "띠 고정 해제" or "띠 고정")

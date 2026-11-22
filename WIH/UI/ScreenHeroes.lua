@@ -15,6 +15,7 @@ local Items = WIH.module("Items")
 local Inventory = WIH.module("Inventory")
 local Power = WIH.module("Power")
 local Models = WIH.module("Models")
+local Looks = WIH.module("Looks")
 
 local C = UI.C
 local LIST_W, SIDE_W = 232, 292
@@ -135,7 +136,6 @@ local function createMid(f)
     f.modelIcon = UI.icon(mid, 64)
     f.modelIcon:SetPoint("TOP", 0, -180)
     f.modelIcon:Hide()
-    f.model.onFail = function() f.modelIcon:Show() end
 
     -- 장비 10칸: 캐릭터의 양옆
     f.slots = {}
@@ -474,16 +474,27 @@ local function refresh(f)
         f.exp:set(need and h.exp / need or 1)
         f.expText:SetText(need and ("다음 레벨까지 " .. UI.number(need - h.exp)) or "최대 레벨")
     end
-    -- 모델: 영웅이나 형태, 진영이 바뀌었을 때만 다시 불러온다.
-    local modelKey = hero.id .. ":" .. tostring(form) .. ":" .. s.faction
+    -- 모델: 영웅, 형태, 진영, 낀 장비(겉모습)가 바뀌었을 때만 다시 불러온다.
+    -- 낀 장비대로 옷을 입힌 캐릭터를 먼저 시도하고, 안 되면 생물 모델, 그것도 안 되면 직업 아이콘을 보여 준다.
+    local opts = WIH.Scene.options()
+    local look = opts.looks ~= false and Looks.forHero(s, hero.id) or nil
+    local modelKey = hero.id .. ":" .. tostring(form) .. ":" .. s.faction .. ":" .. (look and look.key or "-") .. ":" .. tostring(opts.models)
     if f.modelKey ~= modelKey then
         f.modelKey = modelKey
         f.modelIcon:Hide()
         f.modelIcon:set(UI.CLASS_ICONS[hero.class])
-        local useModels = WIH.Scene.options().models
-        if not useModels or not f.model:setCreature(Models.heroCandidates(hero.id, s.faction, hero.forms and form or nil), 0.35, 1.2) then
-            f.model:clear()
-            f.modelIcon:Show()
+        local candidates = Models.heroCandidates(hero.id, s.faction, hero.forms and form or nil)
+        local function showIcon() f.model:clear(); f.modelIcon:Show() end
+        if not opts.models then
+            showIcon()
+        elseif look and f.model:setCharacter(look, 0.35, 1.2) then
+            f.model.onFail = function()
+                f.model.onFail = showIcon
+                if not f.model:setCreature(candidates, 0.35, 1.2) then showIcon() end
+            end
+        else
+            f.model.onFail = showIcon
+            if not f.model:setCreature(candidates, 0.35, 1.2) then showIcon() end
         end
     end
     for slot, b in pairs(f.slots) do

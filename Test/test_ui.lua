@@ -85,12 +85,42 @@ T.case("사냥 띠: 메뉴 창을 닫아도 전투가 보이고 진행된다", f
     local views = 0
     for _ in pairs(scene.views) do views = views + 1 end
     T.ok(views >= 1, "장면에 유닛이 그려짐")
-    -- 대역에서는 모델이 불러와지지 않으므로 아이콘 표시로 바뀌어 있어야 한다.
+    -- 대역에서는 모델이 불러와지지 않는다. 장비 룩 → 고정 모델 → 다른 후보를 차례로 기다린 뒤(각 8초) 아이콘 표시로 바뀐다.
     for _, t in pairs(scene.views) do
-        if t.unit and t.unit.kind == "hero" then T.ok(not t.useModel and t.token:IsShown(), "모델이 실패하면 아이콘으로 표시") end
+        if t.unit and t.unit.kind == "hero" then
+            T.ok(not t.useModel and t.token:IsShown(), "모델이 모두 실패하면 아이콘으로 표시")
+        end
     end
+    T.eq(Models.dress, false, "장비 룩이 안 되는 것을 기억함")
+    T.eq(Models.known[Models.HEROES.war_prot[2]], false, "실패한 모델 번호를 기억함")
     T.ok(not App.paused, "진행이 멈추지 않음")
     noErrors("사냥 띠")
+end)
+
+T.case("전투 장면: 영웅이 앞으로 달려 나가 적과 맞붙는다", function()
+    App.restartStage()
+    local scene = Strip.scene
+    local minX, maxX, minGap = math.huge, -math.huge, math.huge
+    for _ = 1, 400 do
+        Stub.advance(0.05, 0.05)
+        local runner = App.session.runner
+        local hero = runner.heroes[1]
+        local p = scene.pos[hero.id]
+        if p then
+            if p.x < minX then minX = p.x end
+            if p.x > maxX then maxX = p.x end
+            for _, u in ipairs(runner.battle.units) do
+                local q = scene.pos[u.id]
+                if u.team == 2 and u.alive and q then
+                    if q.x - p.x < minGap then minGap = q.x - p.x end
+                end
+            end
+        end
+    end
+    T.ok(maxX - minX > 40, string.format("영웅의 화면 자리가 움직임(%.0f ~ %.0f)", minX, maxX))
+    T.ok(minGap < 110, string.format("적과 가까이 붙음(가장 가까웠을 때 %.0f픽셀)", minGap))
+    T.ok(scene.cam ~= nil, "시점이 전장을 따라감")
+    noErrors("전투 장면")
 end)
 
 T.case("사냥 띠: 접기, 숨기기, 진행 설정 누르기", function()
@@ -131,29 +161,69 @@ T.case("사냥 띠: 접기, 숨기기, 진행 설정 누르기", function()
     noErrors("띠 조작")
 end)
 
-T.case("3D 모델: 불러와지면 모델로 표시하고, 실패한 번호는 다음 후보로 넘어간다", function()
-    Stub.modelsWork = true
-    for k in pairs(Models.known) do Models.known[k] = nil end
-    Strip.scene.battle = nil          -- 장면을 다시 꾸민다
-    Stub.advance(3, 0.05)
-    local hero
+local function heroView()
     for _, t in pairs(Strip.scene.views) do
-        if t.unit and t.unit.kind == "hero" then hero = t end
+        if t.unit and t.unit.kind == "hero" then return t end
     end
+end
+
+T.case("장비 룩: 낀 장비대로 옷과 무기를 입힌 캐릭터로 표시한다", function()
+    local s = App.state
+    Stub.modelsWork = true
+    Models.resetKnown()
+    Strip.scene.battle = nil          -- 장면을 다시 꾸민다
+    Stub.advance(2, 0.05)
+    local hero = heroView()
     T.ok(hero and hero.useModel and not hero.token:IsShown(), "영웅이 모델로 표시됨")
-    T.eq(hero.view.creature, Models.HEROES.war_prot[2], "호드 진영의 모델 번호")
-    T.eq(Models.known[hero.view.creature], true)
-    -- 첫 후보가 실패하면 다음 후보(상대 진영의 번호)로
-    Stub.badModels = { [Models.HEROES.war_prot[2]] = true }
-    for k in pairs(Models.known) do Models.known[k] = nil end
+    T.ok(hero.view.look ~= nil, "장비 룩 방식으로 표시")
+    T.eq(Models.dress, true)
+    local look = WIH.Looks.forHero(s, "war_prot")
+    T.eq(hero.view.look.race, 6, "호드의 방어 전사는 타우렌")
+    local worn = table.concat(hero.view.model.__worn, " ")
+    T.ok(worn:find("item:38") and worn:find("item:39"), "장비가 없으면 기본 옷을 입음: " .. worn)
+    -- 장비를 끼면 겉모습이 바뀐다
+    s.inventory.items = {}
+    Inventory.add(s, Items.find("SWORD", 30, 3).id); Inventory.equip(s, "war_prot", 1)
+    Inventory.add(s, Items.find("ARMOR", 50, 3).id); Inventory.equip(s, "war_prot", 1)
+    Inventory.add(s, Items.find("SHIELD", 90, 5).id); Inventory.equip(s, "war_prot", 1)
+    local after = WIH.Looks.forHero(s, "war_prot")
+    T.ok(after.key ~= look.key, "장비에 따라 겉모습이 달라짐")
+    App.restartStage()
+    Stub.advance(2, 0.05)
+    hero = heroView()
+    worn = table.concat(hero.view.model.__worn, " ")
+    T.ok(worn:find("item:" .. WIH.Looks.WEAPONS.SWORD[3]), "검의 겉모습을 입힘: " .. worn)
+    T.ok(worn:find("item:" .. WIH.Looks.WEAPONS.SHIELD[6]), "방패의 겉모습을 입힘")
+    T.ok(worn:find("item:16865"), "갑옷의 겉모습(가슴)을 입힘")
+    T.ok(not worn:find("item:38 "), "갑옷을 끼면 기본 옷은 벗음")
+    for _, h in pairs(s.heroes) do h.gear = {} end
+    s.inventory.items = {}
+    noErrors("장비 룩")
+end)
+
+T.case("3D 모델: 옷을 입힐 수 없는 클라이언트에서는 고정 모델로, 실패한 번호는 다음 후보로 넘어간다", function()
+    Stub.noDress = true
+    Models.resetKnown()
     Strip.scene.battle = nil
     Stub.advance(3, 0.05)
-    for _, t in pairs(Strip.scene.views) do
-        if t.unit and t.unit.kind == "hero" then hero = t end
-    end
+    local hero = heroView()
+    T.ok(hero and hero.useModel and not hero.token:IsShown(), "영웅이 모델로 표시됨")
+    T.eq(hero.view.look, nil)
+    T.eq(hero.view.creature, Models.HEROES.war_prot[2], "호드 진영의 모델 번호")
+    T.eq(Models.known[hero.view.creature], true)
+    T.ok(WIH_UI.displayIds[hero.view.creature], "불러온 생물의 표시 번호를 저장해 둠")
+    -- 첫 후보가 실패하면 다음 후보(상대 진영의 번호)로. 실패 판정까지 8초를 기다린다.
+    WIH_UI.displayIds = {}
+    Stub.badModels = { [Models.HEROES.war_prot[2]] = true }
+    Models.resetKnown()
+    Strip.scene.battle = nil
+    Stub.advance(10, 0.05)
+    hero = heroView()
     T.eq(hero.view.creature, Models.HEROES.war_prot[1], "다음 후보로 넘어감")
     T.eq(Models.known[Models.HEROES.war_prot[2]], false, "실패한 번호를 기억함")
     Stub.badModels = nil
+    Stub.noDress = nil
+    Models.resetKnown()
     -- 설정에서 모델을 끄면 아이콘으로
     Scene.options().models = false
     Stub.advance(1, 0.05)
@@ -169,7 +239,7 @@ T.case("영웅 화면: 목록과 필터, 해금, 스킬 투자·환급·장착, 
     s.heroes.war_prot.level, s.heroes.war_prot.exp = 12, 0
     local f = open("heroes")
     T.ok(f.power:GetText() ~= "" and f.power:IsShown(), "전투력이 보임: " .. f.power:GetText())
-    T.ok(f.model.creature ~= nil, "가운데에 캐릭터 모델")
+    T.ok(f.model.look ~= nil or f.model.creature ~= nil, "가운데에 캐릭터 모델")
     -- 필터: 힐러만
     for _, b in ipairs(f.chips) do if b.id == "healer" then b:Click("LeftButton") end end
     for _, row in ipairs(f.rows) do
@@ -561,10 +631,14 @@ T.case("화면이 부른 위젯 메서드는 모두 아는 이름이다", functi
     T.eq(#unknown, 0, "확인되지 않은 메서드: " .. table.concat(unknown, ", "))
 end)
 
-if not T.report("test_ui") then os.exit(1) end
+local uiOk = T.report("test_ui")
 if arg and arg[1] == "-v" then
     local names = {}
     for name, n in pairs(Stub.unknownCalls) do names[#names + 1] = name .. "×" .. n end
     table.sort(names)
     io.write("대역에 없는 메서드 호출: ", table.concat(names, ", "), "\n")
 end
+if arg and arg[1] == "-v" then
+    for i, e in ipairs(App.lastErrors) do io.write("기록된 오류 ", i, ": ", e, "\n") end
+end
+if not uiOk then os.exit(1) end

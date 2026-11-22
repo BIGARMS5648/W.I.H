@@ -1,21 +1,27 @@
 -- 전투 장면: 사냥 띠 안에서 영웅과 몬스터가 싸우는 모습을 그린다.
 -- 엔진의 상태를 읽어 그리기만 한다. 유닛은 3D 모델로 보여 주고, 모델을 쓸 수 없으면 아이콘 표시로 바꾼다.
--- 화면에서의 자리는 엔진의 좌표를 그대로 쓰지 않는다: 영웅은 편성 순서대로 대열을 이뤄 서고(원거리 영웅이 화면 밖으로
--- 나가지 않게), 적은 선두 영웅과의 실제 거리에 비례해 오른쪽에 놓인다.
+-- 화면에서의 자리는 엔진의 좌표를 그대로 옮긴 것이다: 영웅과 적이 실제로 서로에게 다가가 맞붙는 것이 보인다.
+-- 시점은 선두 영웅을 조금 늦게 따라간다. 그래서 영웅이 달리면 앞으로 나아가는 것이 보이고,
+-- 싸우는 동안 시점이 따라와 자리를 잡는다. 바닥의 눈금이 흘러가 이동을 알려 준다.
+-- 멀리 뒤에 선 원거리 영웅이 화면 밖으로 나가면 왼쪽 가장자리에 붙여 그린다.
 
 local _, WIH = ...
 local UI = WIH.module("UI")
 local App = WIH.module("App")
 local Heroes = WIH.module("Heroes")
 local Models = WIH.module("Models")
+local Looks = WIH.module("Looks")
 local SkillData = WIH.module("SkillData")
 local Scene = WIH.module("Scene")
 
 local C = UI.C
 local GROUND = 12               -- 바닥선의 높이(장면 아래에서부터)
-local HERO_SPACING = 56         -- 대열에서 영웅 사이의 간격(픽셀)
-local FRONT_AT = 0.36           -- 선두 영웅이 서는 가로 위치(장면 폭에 대한 비율)
-local VIEW_RANGE = 900          -- 선두 영웅 앞으로 보이는 거리(엔진 단위)
+local SPAN = 1500               -- 장면에 보이는 전장의 폭(엔진 단위)
+local AHEAD = 760               -- 선두 영웅 앞으로 보이는 거리(새 웨이브가 나타나는 거리보다 조금 길게)
+local CAM_FOLLOW = 1.6          -- 시점이 따라가는 빠르기(1초에 남은 거리의 이 비율만큼). 영웅이 달리면 그만큼 앞서 보인다
+local CAM_SNAP = 1200           -- 시점이 이보다 멀리 떨어져 있으면(띠를 접어 두었을 때 등) 바로 옮긴다
+local MIN_GAP = 30              -- 영웅끼리 겹쳐 보이지 않게 벌리는 최소 간격(픽셀)
+local TICK_EVERY = 150          -- 바닥 눈금의 간격(엔진 단위)
 local FACING = 0.95             -- 모델이 옆을 보는 각도(라디안). 영웅은 오른쪽, 적은 왼쪽을 본다
 
 local SIZE = {                  -- 유닛 종류별 {모델 프레임 폭, 높이, 아이콘 표시 크기}
@@ -77,7 +83,6 @@ local function newView(scene)
     end
     t.cast = UI.text(t, 10, C.text, "CENTER")
     t.cast:SetPoint("BOTTOM", t.hp, "TOP", 0, 8)
-    t.view.onFail = function() t.useModel = false; t.token:Show() end
     t:EnableMouse(true)
     t:SetScript("OnEnter", function(self)
         local u = self.unit
@@ -141,14 +146,24 @@ local function style(scene, t, u, wantModel)
             t.hp:setColor(C.bad)
         end
     end
-    -- 3D 모델
+    -- 3D 모델. 영웅은 낀 장비대로 옷을 입힌 캐릭터를 먼저 시도하고, 안 되면 생물 모델을 쓴다.
     t.useModel = false
     if wantModel then
         local faction = App.state and App.state.faction or "Alliance"
         local flip = Scene.options().modelFlip and -1 or 1
         local facing = (u.team == 1 and FACING or -FACING) * flip
-        if t.view:setCreature(Models.candidates(u, faction), facing, kind == "boss" and 1.05 or 1.15) then
+        local cam = kind == "boss" and 1.05 or 1.15
+        local look = u.kind == "hero" and u.heroId and App.state and Scene.options().looks ~= false and Looks.forHero(App.state, u.heroId)
+        if look and t.view:setCharacter(look, facing, cam) then
             t.useModel = true
+            t.view.onFail = function()
+                -- 입히는 방식이 안 되는 클라이언트: 생물 모델로 다시 시도한다.
+                t.view.onFail = function() t.useModel = false; t.token:Show() end
+                if not t.view:setCreature(Models.candidates(u, faction), facing, cam) then t.useModel = false; t.token:Show() end
+            end
+        else
+            t.view.onFail = function() t.useModel = false; t.token:Show() end
+            if t.view:setCreature(Models.candidates(u, faction), facing, cam) then t.useModel = true end
         end
     else
         t.view:clear()
@@ -193,6 +208,13 @@ function Scene.create(parent)
         local z = UI.fill(scene, C.good, "ARTWORK", 0.2)
         z:Hide()
         scene.zones[i] = z
+    end
+    scene.ticks = {}
+    for i = 1, 14 do
+        local tick = UI.fill(scene, C.text, "BORDER", 0.16)
+        tick:SetSize(1, 4)
+        tick:Hide()
+        scene.ticks[i] = tick
     end
     scene.banner = UI.text(scene, 15, C.text, "CENTER")
     scene.banner:SetPoint("TOP", 0, -6)
@@ -310,18 +332,66 @@ function Scene.update(scene, elapsed)
     local w, h = scene:GetWidth(), scene:GetHeight()
     if not w or w <= 0 then w = 1000 end
     if not h or h <= 0 then h = 100 end
-    local frontX = w * FRONT_AT
-    local scale = (w - frontX - 70) / VIEW_RANGE
+    local scale = w / SPAN
 
-    -- 선두(가장 앞에 있는 살아 있는 영웅)의 엔진 좌표
+    -- 선두(가장 앞의 살아 있는 영웅)의 엔진 좌표
     local lead
     for i = 1, #units do
         local u = units[i]
         if u.kind == "hero" and u.alive and (not lead or u.x > lead) then lead = u.x end
     end
     if not lead then lead = scene.lastLead or 0 end
-    local moving = scene.lastLead ~= nil and math.abs(lead - scene.lastLead) > 0.01
     scene.lastLead = lead
+
+    -- 시점: 선두 앞쪽이 보이도록 왼쪽 끝(cam)을 정하고, 남은 거리에 비례해 늦게 따라간다.
+    -- 영웅이 달리는 동안에는 시점이 뒤처져 영웅이 앞으로 나아가 보이고, 멈춰 싸우면 시점이 따라와 자리를 잡는다.
+    local target = lead + AHEAD - SPAN
+    if not scene.cam or math.abs(target - scene.cam) > CAM_SNAP then
+        scene.cam = target
+    else
+        scene.cam = scene.cam + (target - scene.cam) * math.min(1, elapsed * CAM_FOLLOW)
+    end
+    local cam = scene.cam
+
+    -- 바닥 눈금: 전장에 고정된 표시라서 시점이 움직이면 흘러간다.
+    local first = math.floor(cam / TICK_EVERY) + 1
+    for i = 1, #scene.ticks do
+        local tx = ((first + i - 1) * TICK_EVERY - cam) * scale
+        local tick = scene.ticks[i]
+        if tx >= 0 and tx <= w then
+            tick:ClearAllPoints()
+            tick:SetPoint("BOTTOM", scene, "BOTTOMLEFT", tx, GROUND - 5)
+            tick:Show()
+        else
+            tick:Hide()
+        end
+    end
+
+    -- 영웅의 화면 자리: 엔진 좌표 그대로. 앞에서부터 보며 겹치면 뒤의 영웅을 조금 물리고, 화면 밖이면 가장자리에 붙인다.
+    local heroX = scene.heroX or {}
+    scene.heroX = heroX
+    local list = scene.heroList or {}
+    scene.heroList = list
+    local n = 0
+    for i = 1, #units do
+        local u = units[i]
+        if u.kind == "hero" then n = n + 1; list[n] = u end
+    end
+    for i = n + 1, #list do list[i] = nil end
+    table.sort(list, function(a, b)
+        if a.x ~= b.x then return a.x > b.x end
+        return (a.rank or 0) < (b.rank or 0)
+    end)
+    local prev
+    for i = 1, n do
+        local u = list[i]
+        local x = (u.x - cam) * scale
+        if prev and x > prev - MIN_GAP then x = prev - MIN_GAP end
+        local floor = 28 + (n - i) * 26
+        if x < floor then x = floor end
+        heroX[u.id] = x
+        prev = x
+    end
 
     local seen = {}
     local pos = scene.pos
@@ -330,17 +400,16 @@ function Scene.update(scene, elapsed)
         -- 화면에서의 자리
         local x, lane
         if u.kind == "hero" then
-            x = frontX - ((u.rank or 1) - 1) * HERO_SPACING
+            x = heroX[u.id]
             lane = ((u.rank or 1) % 2) * 5
         elseif u.team == 1 then
+            x = (u.x - cam) * scale
             local owner = u.owner
-            local op = owner and pos[owner.id]
-            x = (op and op.x or frontX) + 30 + (u.id % 3) * 10
+            local ox = owner and heroX[owner.id]
+            if ox and x < ox - 60 then x = ox + 24 + (u.id % 3) * 10 end     -- 주인이 가장자리에 붙었으면 그 곁에
             lane = 10
         else
-            local d = u.x - lead
-            if d < 40 then d = 40 end
-            x = frontX + 14 + d * scale
+            x = (u.x - cam) * scale
             lane = (u.id % 3) * 5
         end
         local visible = x > -40 and x < w + 40
@@ -373,7 +442,11 @@ function Scene.update(scene, elapsed)
             t:ClearAllPoints()
             t:SetPoint("BOTTOM", scene, "BOTTOMLEFT", x, y)
             t:SetFrameLevel(scene:GetFrameLevel() + 2 + (10 - lane))
-            if t.useModel then t.view:update(elapsed) end
+            if t.useModel then
+                t.view:update(elapsed)
+                -- 모델이 올라오기 전까지는 아이콘을 보여 준다. (update 안에서 실패가 확정되면 useModel이 꺼지고 아이콘이 켜진다)
+                if t.useModel then t.token:SetShown(t.view:isPending()) end
+            end
 
             if u.alive then
                 t:SetAlpha(u.noTarget and 0.45 or 1)
@@ -387,7 +460,7 @@ function Scene.update(scene, elapsed)
                         if t.animUntil <= 0 then t.animUntil = nil end
                     end
                     if not t.animUntil then
-                        local run = (u.kind == "hero" and moving) or (u.team == 2 and t.lastX ~= nil and math.abs(u.x - t.lastX) > 0.01)
+                        local run = t.lastX ~= nil and math.abs(u.x - t.lastX) > 0.01
                         t.view:setAnim(run and UI.ANIM.run or UI.ANIM.stand)
                     end
                 end
@@ -437,9 +510,7 @@ function Scene.update(scene, elapsed)
     for i = 1, #battle.zones do
         local z = battle.zones[i]
         if not z.isDrone and not z.isChannel and zi < #scene.zones then
-            local d = z.x - lead
-            local cx
-            if d >= 0 then cx = frontX + 14 + d * scale else cx = frontX + math.max(d * 0.06, -4 * HERO_SPACING) end
+            local cx = (z.x - cam) * scale
             local half = math.max(6, z.radius * scale)
             if cx + half > 0 and cx - half < w then
                 zi = zi + 1
