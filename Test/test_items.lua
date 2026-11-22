@@ -194,7 +194,7 @@ T.case("상자 표: 가중치 합이 맞고, 모든 묶음이 어느 종류로�
         T.ok(math.abs(total - 1000000) < 200, "표 " .. id .. "의 가중치 합: " .. total)
         n = n + 1
     end
-    T.eq(n, 42)
+    T.eq(n, 42 + #WIH.ExpeditionTable.tables, "던전·레이드 42개 + 원정·낙스라마스")
     -- 던전 스테이지 108개에 일반·스테이지 상자 표와 충전 시간이 있다
     local stages = 0
     for key, st in pairs(Tables.STAGES) do
@@ -202,7 +202,7 @@ T.case("상자 표: 가중치 합이 맞고, 모든 묶음이 어느 종류로�
         T.ok(info, "스테이지 " .. key .. "의 상자 정보가 없음")
         if not st.actBoss then
             T.ok(ChestTable.tables[info.normal] and ChestTable.tables[info.boss] and info.cool > 0 and info.bossCool > 0)
-            stages = stages + 1
+            if not st.expedition then stages = stages + 1 end
         else
             T.ok(ChestTable.tables[info.raid])
         end

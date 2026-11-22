@@ -28,6 +28,8 @@ Progression\Level.lua
 Data\Monsters.lua
 Data\Dungeons.lua
 Data\Raids.lua
+Data\ExpeditionData.lua
+Data\ExpeditionTable.lua
 Data\Models.lua
 Stage\Runner.lua
 Data\ItemTable.lua
@@ -37,6 +39,7 @@ Data\Materials.lua
 Inventory\Items.lua
 Inventory\Inventory.lua
 Inventory\Chests.lua
+Stage\Expeditions.lua
 Data\CubeTable.lua
 Data\MaterialNames.lua
 Inventory\Cube.lua

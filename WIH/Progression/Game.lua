@@ -48,6 +48,7 @@ function Game.new(faction, starter, now)
     WIH.Chests.ensure(state)
     WIH.Pets.ensure(state)
     WIH.Cube.ensure(state)
+    WIH.Expeditions.ensure(state)
     return state
 end
 
@@ -296,6 +297,10 @@ end
 -- 스테이지가 열렸는지: 첫 스테이지이거나 바로 앞 스테이지를 클리어했을 때. [원작]
 function Game.stageUnlocked(state, key)
     if not Tables.STAGES[key] then return false end
+    if WIH.Expeditions then
+        local special = WIH.Expeditions.stageUnlocked(state, key)
+        if special ~= nil then return special end
+    end
     if key == 1101 then return true end
     local prev = Game.previousStage(key)
     return prev ~= nil and (state.stage.cleared[prev] or 0) > 0
@@ -311,7 +316,8 @@ function Game.selectStage(state, difficulty, section)
     if not s or s.actBoss or not Dungeons.sections[section] then return fail("선택할 수 없는 스테이지입니다.") end
     if not Game.stageUnlocked(state, key) then return fail("아직 열리지 않은 스테이지입니다.") end
     state.stage.difficulty, state.stage.section = difficulty, section
-    state.stage.raidKey = nil        -- 던전을 고르면 예약했거나 진행 중인 레이드는 그만둔다
+    state.stage.raidKey = nil        -- 던전을 고르면 예약했거나 진행 중인 레이드·원정은 그만둔다
+    state.stage.expedition = nil
     return true
 end
 
@@ -335,6 +341,7 @@ function Game.startRaid(state, difficulty, act)
     local ok, key = Game.canStartRaid(state, difficulty, act)
     if not ok then return false, key end
     state.stage.raidKey = key
+    state.stage.expedition = nil
     return true, key
 end
 

@@ -31,18 +31,19 @@ local TRAVEL_PAUSE = 0.6    -- [독자] 웨이브를 정리한 뒤 다음 웨이
 --   party = { {heroId, form, passivePoints, skills = {{id, level}, ...}, gear, level, exp}, ... } (편성 순서)
 --   account(계정 공통 시트), bossIndex(이번에 나올 보스의 순번), tuning = {hp, atk}(5인 보정 계수), onEvent
 --   raidKey(레이드 스테이지의 키): 주면 그 레이드를 진행한다. 보스를 차례로 상대하며 wave가 보스 순번이 된다.
+--   stageKey: 주면 그 스테이지(원정 등)를 진행한다. 스테이지 표에 section(몬스터 구성)이 들어 있다.
 function Runner.new(opts)
-    local key = opts.raidKey or Dungeons.stageKey(opts.difficulty or 1, opts.section)
+    local key = opts.stageKey or opts.raidKey or Dungeons.stageKey(opts.difficulty or 1, opts.section)
     local stage = Tables.STAGES[key]
     local raid, section
     if stage and stage.actBoss then
-        raid = Raids.byAct[math.floor(key % 1000 / 100)]
+        raid = stage.raid or Raids.byAct[math.floor(key % 1000 / 100)]
         if not raid then error("레이드 데이터가 없음: " .. tostring(key)) end
     else
-        section = Dungeons.sections[opts.section]
+        section = stage and stage.section or Dungeons.sections[opts.section]
         if not stage or not section then error("알 수 없는 스테이지: " .. tostring(key)) end
     end
-    local difficulty = raid and math.floor(key / 1000) or (opts.difficulty or 1)
+    local difficulty = stage.difficulty or (raid and math.floor(key / 1000)) or (opts.difficulty or 1)
     local r = setmetatable({
         key = key, stage = stage, section = section, raid = raid, difficulty = difficulty,
         party = opts.party, account = opts.account, tuning = opts.tuning or { hp = 1, atk = 1 },
@@ -95,24 +96,34 @@ local function sectionMeans(section)
 end
 Runner.sectionMeans = sectionMeans
 
+-- 원정의 강도 강화 [원작]: 체력·공격력·이동속도에 (1 + 퍼밀 ÷ 1000)을 곱한다 [추정: 곱연산]
+local function boost(stage)
+    local b = stage.boost
+    if not b then return 1, 1, 1 end
+    return 1 + b[1] / 1000, 1 + b[2] / 1000, 1 + b[3] / 1000
+end
+
 -- 일반 몬스터 한 종의 실제 수치: 원작 스테이지 평균 × (이 몬스터의 기본값 ÷ 구간 평균)
 function Runner.mobValues(stage, section, def)
     local mean, target = sectionMeans(section), stage.mob
+    local hpM, atkM, msM = boost(stage)
     return {
-        hp = target.hp * def.hp / mean.hp,
-        atk = target.dps * (def.atk * def.as / 100) / mean.dps / (def.as / 100),
+        hp = target.hp * def.hp / mean.hp * hpM,
+        atk = target.dps * (def.atk * def.as / 100) / mean.dps / (def.as / 100) * atkM,
         gold = target.gold * def.gold / mean.gold,
         exp = target.exp * def.exp / mean.exp,
+        msMult = msM,
     }
 end
 
 -- 보스의 실제 수치: 원작 스테이지 보스의 최종값 × (이 보스의 기본값 ÷ 구간 보스 평균). 보상은 원작 값 그대로.
 function Runner.bossValues(stage, section, def)
     local mean, target = sectionMeans(section), stage.bossFinal
+    local hpM, atkM, msM = boost(stage)
     return {
-        hp = target.hp * def.hp / mean.bossHp,
-        atk = target.dps * (def.atk * def.as / 100) / mean.bossDps / (def.as / 100),
-        gold = target.gold, exp = target.exp,
+        hp = target.hp * def.hp / mean.bossHp * hpM,
+        atk = target.dps * (def.atk * def.as / 100) / mean.bossDps / (def.as / 100) * atkM,
+        gold = target.gold, exp = target.exp, msMult = msM,
     }
 end
 
@@ -125,7 +136,7 @@ function Runner.spawnMonster(battle, def, values, x, tuning, maxSkills)
     if hp < 1 then hp = 1 end
     local u = Unit.new({
         name = def.name, team = 2, kind = "monster", isBoss = def.isBoss, def = def,
-        base = { MaxHp = hp, AttackDamage = atk, AttackSpeed = def.as, MovementSpeed = def.ms, CriticalDamage = 1000,
+        base = { MaxHp = hp, AttackDamage = atk, AttackSpeed = def.as, MovementSpeed = def.ms * (values.msMult or 1), CriticalDamage = 1000,
             CastSpeed = 100 },
         melee = def.melee, range = def.range, x = x, rank = 50,
         basicElem = def.elem, basicDelivery = def.melee and "melee" or "proj", basicArea = def.area,
@@ -167,7 +178,12 @@ end
 
 function R:spawnBoss()
     local ids = self.section.bosses
-    local id = ids[(self.bossIndex - 1) % #ids + 1]
+    local turn = self.bossIndex
+    -- 원정: 강도에 따라 보스가 돌아가며 나오고, 강도 20은 마지막 보스다 [원작 구조]
+    if self.stage.bossRotation then
+        turn = self.stage.bossRotation >= 20 and #ids or ((self.stage.bossRotation - 1) % (#ids - 1) + 1)
+    end
+    local id = ids[(turn - 1) % #ids + 1]
     local def = Monsters.defs[id]
     self.boss = Runner.spawnMonster(self.battle, def, Runner.bossValues(self.stage, self.section, def), self:frontX() + BOSS_GAP, self.tuning)
     self.phase = "boss"

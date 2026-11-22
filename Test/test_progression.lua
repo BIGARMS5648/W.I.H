@@ -17,9 +17,12 @@ T.case("원작 표의 크기와 대표값", function()
     T.ok(Tables.EXP[43] < Tables.EXP[40], "레벨 40~43 구간은 원작대로 줄어든다")
     T.eq(#Tables.STAGE_LEVEL, 170)
     T.eq(#Tables.OFFLINE, 116)
-    local n = 0
-    for _ in pairs(Tables.STAGES) do n = n + 1 end
-    T.eq(n, 120)
+    local n, extra = 0, 0
+    for _, st in pairs(Tables.STAGES) do
+        if st.expedition or st.naxx then extra = extra + 1 else n = n + 1 end
+    end
+    T.eq(n, 120, "원작 일반 지역 스테이지")
+    T.eq(extra, 60 + 9, "원정 60(난이도 3 × 강도 20) + 낙스라마스 9")
 end)
 
 T.case("스테이지 구조: 난이도 4 × 액트 3 × 10, 한 줄로 이어진다", function()

@@ -61,6 +61,10 @@ local function record(ev, a, b, c)
     elseif ev == "raidClear" then
         if b == "opened" then App.lastLoot = Chests.resultText(c) end
         App.addLog("|cffd9b05e레이드 클리어|r  레이드 상자를 " .. (b == "opened" and ("바로 열었습니다: " .. App.lastLoot) or "받았습니다."))
+    elseif ev == "supplyOut" then
+        App.addLog("|cffcf5f58원정 보급품이 떨어져 던전으로 돌아왔습니다.|r 보급품은 원정 밖에서 차고, 큐브의 보급 전환으로 채울 수 있습니다.")
+    elseif ev == "expeditionLeft" then
+        App.addLog("원정에서 돌아왔습니다.")
     elseif ev == "pet" then
         App.addLog("|cffd9b05e새 펫|r  " .. a.name .. "  (" .. WIH.Pets.effectText(a) .. ")")
     elseif ev == "raidUnlocked" then
@@ -168,6 +172,8 @@ local function onLoaded()
         -- 자리를 비운 시간의 보상. 같은 시간을 두 번 치지 않도록 바로 저장 시각을 지금으로 옮긴다.
         local reward = WIH.Offline.compute(state, now())
         if reward then WIH.Offline.addPending(state, reward) end
+        local away = now() - (state.savedAt or now())
+        if away > 0 and away < WIH.Offline.GUARD_SECONDS then WIH.Expeditions.tick(state, away, false) end
         state.savedAt = now()
         startSession()
     else

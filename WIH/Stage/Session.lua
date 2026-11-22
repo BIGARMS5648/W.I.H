@@ -35,6 +35,7 @@ function Session.new(state, opts)
     WIH.Chests.ensure(state)
     WIH.Pets.ensure(state)
     WIH.Cube.ensure(state)
+    WIH.Expeditions.ensure(state)
     return s
 end
 
@@ -67,15 +68,22 @@ function S:startStage()
     if raidKey and not (Tables.STAGES[raidKey] and Tables.STAGES[raidKey].actBoss) then
         raidKey, state.stage.raidKey = nil, nil
     end
+    -- 원정: 보급품이 떨어졌으면 던전으로 돌아간다.
+    local expKey = not raidKey and state.stage.expedition or nil
+    if expKey and state.supply <= 0 then
+        state.stage.expedition, expKey = nil, nil
+        self:emit("supplyOut")
+    end
     self.inRaid = raidKey ~= nil
-    if raidKey then key = raidKey end
+    self.inExpedition = expKey ~= nil
+    if raidKey then key = raidKey elseif expKey then key = expKey end
     self.runs = self.runs + 1
     -- 계정 공통 수정치: 룬(+ 시험용으로 밖에서 넣은 시트)
     local account, totals = WIH.Runes.sheet(state)
     if self.account then WIH.Sheet.merge(account, self.account) end
     self.runeTotals = totals
     self.runner = Runner.new({
-        difficulty = state.stage.difficulty, section = state.stage.section, raidKey = raidKey,
+        difficulty = state.stage.difficulty, section = state.stage.section, raidKey = raidKey, stageKey = expKey,
         waveReduction = totals.WaveCountReduction or 0,
         seed = self.seed + self.runs * 7919, party = Game.buildParty(state), account = account,
         bossIndex = state.stage.bossIndex[key] or 1, tuning = self.tuning,
@@ -130,6 +138,10 @@ function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
             self:afterRaidClear()
             return
         end
+        if self.inExpedition then
+            self:afterExpedition(true)
+            return
+        end
         if state.stage.cleared[self.stageKey] == 1 then
             local given = WIH.Chests.firstClearReward(state, self.stageKey)
             if given and #given > 0 then self:emit("firstClear", given) end
@@ -151,6 +163,10 @@ function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
             self.wait = BETWEEN_STAGES
             return
         end
+        if self.inExpedition then
+            self:afterExpedition(false)
+            return
+        end
         self:chooseAfterFail()
     else
         self:emit(ev, a, b, c, d, e, f, g)
@@ -165,18 +181,37 @@ function S:checkPets()
     end
 end
 
+-- 원정의 다음 스테이지: 클리어하면 자동 진행일 때 다음 강도로, 실패하면 재시도가 꺼져 있을 때 한 강도 아래로.
+function S:afterExpedition(cleared)
+    local state = self.state
+    local s = Tables.STAGES[self.stageKey].expedition
+    self.wait = BETWEEN_STAGES
+    local n = s.intensity
+    if cleared then
+        if not state.settings.repeatMode and state.settings.autoAdvance and n < 20 then n = n + 1 end
+    elseif not state.settings.autoRetry then
+        n = n - 1
+    end
+    if n < 1 then
+        WIH.Expeditions.leave(state)
+        self:emit("expeditionLeft")
+    else
+        state.stage.expedition = WIH.Expeditions.keys[s.difficulty][n]
+    end
+end
+
 -- 레이드 클리어: 입장 재료 1개를 쓰고 레이드 상자를 받는다. 처음 클리어했으면 반복 설정과 상관없이 다음 스테이지로 넘어간다. [원작 1.3.0]
 function S:afterRaidClear()
     local state = self.state
     local key = self.stageKey
-    local difficulty = math.floor(key / 1000)
-    local token = WIH.Raids.TOKEN[difficulty]
+    local token = Tables.STAGES[key].token
     state.materials[token] = math.max(0, (state.materials[token] or 0) - 1)
+    if state.materials[token] == 0 then state.materials[token] = nil end
     local how, result = WIH.Chests.giveRaid(state, key, self.lootRng)
     self:emit("raidClear", key, how, result)
     state.stage.raidKey = nil
     self.wait = BETWEEN_STAGES
-    if state.stage.cleared[key] == 1 then
+    if state.stage.cleared[key] == 1 and not Tables.STAGES[key].naxx then
         local nextKey = Tables.STAGES[key].next
         if nextKey and Dungeons.sections[nextKey % 1000] then
             Game.selectStage(state, math.floor(nextKey / 1000), nextKey % 1000)
@@ -227,9 +262,10 @@ function S:advance(dt, maxTicks)
         if self.acc < 0 then self.acc = 0 end
         done = done + 1
         self.state.stats.playSeconds = self.state.stats.playSeconds + TICK
+        WIH.Expeditions.tick(self.state, TICK, self.inExpedition and self.runner ~= nil and not self.runner.result)
         self.chestAcc = (self.chestAcc or 0) + TICK
         if self.chestAcc >= 1 then       -- 상자의 허용량 충전과 자동 개봉은 1초 단위로 본다
-            WIH.Chests.tick(self.state, self.chestAcc, Game.currentStageKey(self.state), self.lootRng, self.onLoot)
+            WIH.Chests.tick(self.state, self.chestAcc, self.stageKey or Game.currentStageKey(self.state), self.lootRng, self.onLoot)
             self.chestAcc = 0
         end
         if self.wait > 0 then
