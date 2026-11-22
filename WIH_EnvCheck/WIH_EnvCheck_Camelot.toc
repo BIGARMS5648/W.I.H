@@ -1,0 +1,11 @@
+## Interface: 16001
+## Title: W.I.H 환경 점검 (Camelot TOC)
+## Notes: W.I.H 개발용 환경 점검 도구입니다. /wihcheck 로 창을 엽니다.
+## Version: 0.1.0
+## SavedVariables: WIH_EnvCheckDB
+## SavedVariablesPerCharacter: WIH_EnvCheckCharDB
+## IconTexture: Interface\Icons\INV_Misc_Gear_01
+## AddonCompartmentFunc: WIH_EnvCheck_OnCompartmentClick
+## X-WIH-TOC: camelot
+
+EnvCheck.lua
