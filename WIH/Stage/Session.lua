@@ -33,6 +33,7 @@ function Session.new(state, opts)
     s.onLoot = makeLootHandler(s)
     WIH.Inventory.ensure(state)
     WIH.Chests.ensure(state)
+    WIH.Pets.ensure(state)
     return s
 end
 
@@ -112,6 +113,7 @@ function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
             end
         end
         self:emit("kill", a, reward)
+        if a.def and a.def.id then WIH.Pets.onKill(state, a.def.id) end
         -- 상자: 확률, 획득 허용량, 보관 한도를 통과하면 하나를 받는다.
         if not self.inRaid then
             local chestKind = a.isBoss and "stage" or "normal"
@@ -122,6 +124,7 @@ function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
     elseif ev == "clear" then
         Game.markCleared(state, self.stageKey)
         self:emit("clear", self.stageKey, self.runner and self.runner.totals)
+        self:checkPets()
         if self.inRaid then
             self:afterRaidClear()
             return
@@ -140,6 +143,7 @@ function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
     elseif ev == "fail" then
         state.stats.fails = state.stats.fails + 1
         self:emit("fail", self.stageKey)
+        self:checkPets()
         if self.inRaid then
             -- 레이드 실패: 입장 재료는 쓰이지 않는다. 하던 던전으로 돌아간다. [추정: 원작은 클리어했을 때만 소모]
             state.stage.raidKey = nil
@@ -149,6 +153,14 @@ function S:onRunnerEvent(ev, a, b, c, d, e, f, g)
         self:chooseAfterFail()
     else
         self:emit(ev, a, b, c, d, e, f, g)
+    end
+end
+
+-- 펫의 조건을 확인한다(스테이지가 끝날 때마다).
+function S:checkPets()
+    local got = WIH.Pets.check(self.state)
+    if got then
+        for _, pet in ipairs(got) do self:emit("pet", pet) end
     end
 end
 

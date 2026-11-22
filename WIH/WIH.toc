@@ -42,7 +42,9 @@ Progression\Game.lua
 Data\Runes.lua
 Progression\Runes.lua
 Stage\Session.lua
+Progression\Pets.lua
 Progression\Power.lua
+Progression\Offline.lua
 Save\Save.lua
 UI\Theme.lua
 UI\ModelView.lua
@@ -50,6 +52,7 @@ UI\App.lua
 UI\Scene.lua
 UI\Strip.lua
 UI\Main.lua
+UI\Reward.lua
 UI\ScreenSetup.lua
 UI\ScreenBag.lua
 UI\ScreenHeroes.lua

@@ -163,6 +163,8 @@ function Save.validate(state)
     end
     WIH.Inventory.validate(state, notes)
     WIH.Chests.validate(state, notes)
+    if WIH.Offline then WIH.Offline.validate(state) end
+    WIH.Pets.validate(state)
 
     local party, seen = {}, {}
     if type(state.party) == "table" then

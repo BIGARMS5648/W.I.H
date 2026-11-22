@@ -81,7 +81,6 @@ Runes.STATS = {
 -- 해당 시스템을 구현할 때 여기서 지운다. 화면은 이 표를 보고 "미적용"을 표시한다.
 Runes.INACTIVE = {
     CubeExpPercent = "큐브",
-    OfflineRewardGoldPercent = "오프라인 보상", OfflineRewardExpPercent = "오프라인 보상", UnlockOfflineReward = "오프라인 보상",
     UnlockStashPageCount = "보관함",
 }
 
@@ -151,8 +150,8 @@ function Runes.buy(state, key)
     return true
 end
 
--- 스탯별 합계
-function Runes.totals(state)
+-- 룬만의 스탯별 합계
+function Runes.ownTotals(state)
     local totals = {}
     for key, level in pairs(state.runes or {}) do
         local node = nodes[key]
@@ -165,13 +164,20 @@ function Runes.totals(state)
     return totals
 end
 
+-- 계정 공통 합계: 룬 + 펫. 골드·경험치·상자 계산은 모두 이 합계를 쓴다.
+function Runes.totals(state)
+    local totals = Runes.ownTotals(state)
+    if WIH.Pets then WIH.Pets.addTotals(state, totals) end
+    return totals
+end
+
 function Runes.total(state, stat)
     return Runes.totals(state)[stat] or 0
 end
 
 -- 룬의 해금 효과를 상태에 반영한다(편성 칸, 스킬 칸).
 function Runes.apply(state)
-    local totals = Runes.totals(state)
+    local totals = Runes.ownTotals(state)
     state.unlocks.partySlots = math.min(Game.MAX_PARTY_SLOTS, Game.BASE_PARTY_SLOTS + (totals.UnlockArrangeSlotCount or 0))
     state.unlocks.skillSlots = math.min(Game.MAX_SKILL_SLOTS, Game.BASE_SKILL_SLOTS + (totals.UnlockSkillSlotCount or 0))
     return totals

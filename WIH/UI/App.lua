@@ -61,6 +61,8 @@ local function record(ev, a, b, c)
     elseif ev == "raidClear" then
         if b == "opened" then App.lastLoot = Chests.resultText(c) end
         App.addLog("|cffd9b05e레이드 클리어|r  레이드 상자를 " .. (b == "opened" and ("바로 열었습니다: " .. App.lastLoot) or "받았습니다."))
+    elseif ev == "pet" then
+        App.addLog("|cffd9b05e새 펫|r  " .. a.name .. "  (" .. WIH.Pets.effectText(a) .. ")")
     elseif ev == "raidUnlocked" then
         local act = math.floor(a % 1000 / 100)
         App.addLog("이 액트의 던전을 모두 돌파했습니다. 다음으로 가려면 스테이지 화면에서 |cffd9b05e" .. WIH.Raids.byAct[act].name .. "|r 레이드를 클리어해야 합니다.")
@@ -89,7 +91,7 @@ local function startSession()
             if not ok then WIH.UI.reportError(err) end
         end
         if ev == "levelUp" or ev == "clear" or ev == "fail" or ev == "stageStart" or ev == "raidUnlocked"
-            or ev == "chest" or ev == "loot" or ev == "firstClear" or ev == "raidClear" or ev == "token" then
+            or ev == "chest" or ev == "loot" or ev == "firstClear" or ev == "raidClear" or ev == "token" or ev == "pet" then
             App.notify(ev)
         end
     end)
@@ -163,6 +165,10 @@ local function onLoaded()
         App.state = state
         WIH_DB = state
         Runes.apply(state)
+        -- 자리를 비운 시간의 보상. 같은 시간을 두 번 치지 않도록 바로 저장 시각을 지금으로 옮긴다.
+        local reward = WIH.Offline.compute(state, now())
+        if reward then WIH.Offline.addPending(state, reward) end
+        state.savedAt = now()
         startSession()
     else
         WIH_DB = nil
