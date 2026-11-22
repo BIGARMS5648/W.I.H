@@ -1,0 +1,17 @@
+## Interface: 16001
+## Title: W.I.H
+## Notes: 와우 포에버 안에서 즐기는 독립형 방치 RPG
+## Version: 0.1.0
+## SavedVariables: WIH_DB, WIH_DB_BACKUP
+## IconTexture: Interface\Icons\INV_Misc_Gear_01
+## X-WIH-TOC: base
+
+Core\Init.lua
+Core\Rng.lua
+Data\Stats.lua
+Combat\Sheet.lua
+Combat\Unit.lua
+Combat\Battle.lua
+AI\Targeting.lua
+Combat\Skills.lua
+AI\Act.lua
