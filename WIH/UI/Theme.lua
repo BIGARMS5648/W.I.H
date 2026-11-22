@@ -1,6 +1,9 @@
 -- 화면의 색, 글꼴, 간격과 기본 부품.
 -- 방향: 어두운 무채색 바탕, 얇은 선, 절제된 강조색. 색은 의미가 있는 곳(진영, 등급, 위험)에만 쓴다.
 -- 게임 내 확인(2026-11-22): SetColorTexture, 글꼴 객체 상속, SetResizeBounds 사용 가능. SetBackdrop은 쓰지 않는다.
+-- 배치 규칙: 폭을 늘이는 두 번째 기준점은 첫 기준점과 세로 기준이 같은 것만 쓴다
+--   (TOPLEFT + TOPRIGHT, LEFT + RIGHT, BOTTOMLEFT + BOTTOMRIGHT, 또는 TOPLEFT + BOTTOMRIGHT).
+--   TOPLEFT + RIGHT처럼 섞으면 "위"와 "세로 가운데"가 함께 정해져 높이가 뜻하지 않게 늘어난다.
 
 local _, WIH = ...
 local UI = WIH.module("UI")

@@ -95,7 +95,7 @@ local function create(parent)
 
     f.stats = UI.paragraph(d, 11, C.sub)
     f.stats:SetPoint("TOPLEFT", 0, -56)
-    f.stats:SetPoint("RIGHT", 0, 0)
+    f.stats:SetPoint("TOPRIGHT", 0, -56)
 
     f.forms = {}
     for i, form in ipairs({ "bear", "cat" }) do
@@ -111,7 +111,7 @@ local function create(parent)
     -- 스킬 트리: 티어 8줄
     local tree = CreateFrame("Frame", nil, d)
     tree:SetPoint("TOPLEFT", 0, -124)
-    tree:SetPoint("RIGHT", 0, 0)
+    tree:SetPoint("TOPRIGHT", 0, -124)
     tree:SetHeight(8 * 42)
     f.tree = tree
     f.actives, f.passives, f.equips = {}, {}, {}
@@ -267,7 +267,8 @@ local function refresh(f)
 
     -- 능력치: 전투와 같은 계산으로 만든 유닛에서 읽는다.
     local sheet = Runes.sheet(s)
-    local u = HeroBuild.makeUnit(f.heroId, { form = form, passivePoints = h.passive, account = sheet })
+    local u = HeroBuild.makeUnit(f.heroId, { form = form, passivePoints = h.passive, account = sheet,
+        gear = WIH.Inventory.gearSheet(s, f.heroId) })
     f.stats:SetText(string.format(
         "체력 %s   방어도 %s   공격력 %s   공격속도 %.2f   치명타 %.1f%%   치명타 피해 %.0f%%\n이동속도 %s   사거리 %d   재사용 감소 %.0f%%   회피 %.0f%%   막기 %.0f%%   피해 감소 %.0f%%",
         UI.number(u:get("MaxHp")), UI.number(u:get("Armor")), SkillData.formatNumber(u:get("AttackDamage")), u:get("AttackSpeed"),

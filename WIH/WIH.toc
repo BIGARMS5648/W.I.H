@@ -46,6 +46,7 @@ UI\Main.lua
 UI\ScreenSetup.lua
 UI\ScreenBattle.lua
 UI\ScreenHeroes.lua
+UI\ScreenBag.lua
 UI\ScreenParty.lua
 UI\ScreenStage.lua
 UI\ScreenRunes.lua

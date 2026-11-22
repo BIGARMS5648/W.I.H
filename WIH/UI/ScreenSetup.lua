@@ -106,7 +106,7 @@ local function create(parent)
     f.detailRole:SetPoint("TOPLEFT", f.detailName, "BOTTOMLEFT", 0, -6)
     f.detailBody = UI.paragraph(detail, 12, UI.C.sub)
     f.detailBody:SetPoint("TOPLEFT", 14, -70)
-    f.detailBody:SetPoint("RIGHT", -14, 0)
+    f.detailBody:SetPoint("TOPRIGHT", -14, -70)
 
     f.back = UI.button(step2, "진영 다시 고르기", 130, 28, function()
         f.step = 1

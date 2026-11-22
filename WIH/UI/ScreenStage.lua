@@ -102,7 +102,7 @@ local function create(parent)
     f.info:SetPoint("BOTTOMRIGHT", 0, 0)
     f.body = UI.paragraph(f.info.content, 12, C.sub)
     f.body:SetPoint("TOPLEFT", 0, 0)
-    f.body:SetPoint("RIGHT", -4, 0)
+    f.body:SetPoint("TOPRIGHT", -4, 0)
     if f.body.SetSpacing then f.body:SetSpacing(3) end
     return f
 end
@@ -202,4 +202,4 @@ local function update(f, elapsed)
     f.info:setHeight((f.body:GetStringHeight() or 400) + 10)
 end
 
-UI.screens.stage = { label = "스테이지", order = 4, create = create, refresh = refresh, update = update }
+UI.screens.stage = { label = "스테이지", order = 5, create = create, refresh = refresh, update = update }

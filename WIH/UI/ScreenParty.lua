@@ -37,8 +37,8 @@ local function create(parent)
     title:SetPoint("TOPLEFT", 14, -14)
     title:SetText("편성")
     f.help = UI.paragraph(f, 11, C.sub)
-    f.help:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-    f.help:SetPoint("RIGHT", -14, 0)
+    f.help:SetPoint("TOPLEFT", 14, -36)
+    f.help:SetPoint("TOPRIGHT", -14, -36)
     f.help:SetText("1번이 맨 앞에 섭니다. 적은 가장 가까운 영웅부터 공격하므로 버틸 수 있는 영웅을 앞에 두세요. 편성 칸은 룬에서 늘립니다.")
 
     f.cards = {}
@@ -109,8 +109,8 @@ local function create(parent)
     f.bench:SetPoint("BOTTOMRIGHT", -14, 50)
     f.benchRows = {}
     f.benchEmpty = UI.paragraph(f, 11, C.dim)
-    f.benchEmpty:SetPoint("TOPLEFT", benchTitle, "BOTTOMLEFT", 0, -10)
-    f.benchEmpty:SetPoint("RIGHT", -14, 0)
+    f.benchEmpty:SetPoint("TOPLEFT", 14 + CARD_W + 16, -86)
+    f.benchEmpty:SetPoint("TOPRIGHT", -14, -86)
 
     f.apply = UI.button(f, "지금 적용", 96, 26, function()
         f.dirty = false
@@ -133,7 +133,7 @@ local function benchRow(f, n)
         apply(f, list)
     end)
     row:SetPoint("TOPLEFT", 0, -(n - 1) * 34)
-    row:SetPoint("RIGHT", 0, 0)
+    row:SetPoint("TOPRIGHT", 0, -(n - 1) * 34)
     row.label:ClearAllPoints()
     row.label:SetPoint("LEFT", 10, 0)
     row.label:SetJustifyH("LEFT")
@@ -210,4 +210,4 @@ local function refresh(f)
     f.hint:SetText(f.dirty and "바꾼 편성은 다음 스테이지부터 적용됩니다." or ("편성 칸 " .. #s.party .. " / " .. slots))
 end
 
-UI.screens.party = { label = "편성", order = 3, create = create, refresh = refresh }
+UI.screens.party = { label = "편성", order = 4, create = create, refresh = refresh }

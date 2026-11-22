@@ -377,8 +377,8 @@ local function newCard(parent)
     card.icon = UI.icon(card, 30)
     card.icon:SetPoint("TOPLEFT", 8, -8)
     card.name = UI.text(card, 12, C.text)
-    card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 8, 0)
-    card.name:SetPoint("RIGHT", -6, 0)
+    card.name:SetPoint("TOPLEFT", 46, -8)
+    card.name:SetPoint("TOPRIGHT", -6, -8)
     card.level = UI.text(card, 11, C.sub)
     card.level:SetPoint("TOPLEFT", card.name, "BOTTOMLEFT", 0, -4)
     card.hp = UI.bar(card, 144, 9, C.good)
@@ -537,6 +537,14 @@ local function create(parent)
             banner(f.scene, "전멸", C.bad)
         elseif ev == "levelUp" then
             line = Heroes.byId[a].name .. " 레벨 " .. b
+        elseif ev == "firstClear" then
+            local names = {}
+            for _, item in ipairs(a) do names[#names + 1] = WIH.Items.name(item) end
+            line = "|cffd9b05e첫 클리어 보상|r  " .. table.concat(names, ", ") .. "  (가방 화면에서 장착하세요)"
+        elseif ev == "chest" then
+            line = WIH.Chests.NAMES[a] .. "를 얻었습니다."
+        elseif ev == "loot" then
+            line = WIH.Chests.NAMES[a] .. " 자동 개봉: " .. UI.lootText(b)
         elseif ev == "raidUnlocked" then
             line = "이 액트의 던전을 모두 돌파했습니다. 레이드는 아직 구현되지 않아 현재 스테이지를 반복합니다."
         end

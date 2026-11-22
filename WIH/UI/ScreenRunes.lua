@@ -87,7 +87,7 @@ local function getRow(f, n)
     row = UI.panel(f.list.content, C.panel, true)
     row:SetHeight(ROW_H - 4)
     row:SetPoint("TOPLEFT", 0, -(n - 1) * ROW_H)
-    row:SetPoint("RIGHT", -2, 0)
+    row:SetPoint("TOPRIGHT", -2, -(n - 1) * ROW_H)
     row.name = UI.text(row, 12, C.text)
     row.name:SetPoint("TOPLEFT", 10, -5)
     row.sub = UI.text(row, 11, C.dim)
@@ -214,7 +214,7 @@ local function create(parent)
     f.summaryScroll:SetPoint("BOTTOMRIGHT", -6, 8)
     f.summary = UI.paragraph(f.summaryScroll.content, 11, C.text)
     f.summary:SetPoint("TOPLEFT", 0, 0)
-    f.summary:SetPoint("RIGHT", -4, 0)
+    f.summary:SetPoint("TOPRIGHT", -4, 0)
     if f.summary.SetSpacing then f.summary:SetSpacing(4) end
 
     f.lock = UI.text(f, 12, C.warn)
@@ -228,9 +228,14 @@ local function create(parent)
     return f
 end
 
+-- 화면을 열 때만 순서를 다시 정한다. 진행 중에 오는 갱신(클리어, 상자 등)은 순서를 건드리지 않는다.
+local function onShow(f)
+    if App.state then rebuild(f) end
+end
+
 local function refresh(f)
     if not App.state then return end
-    rebuild(f)
+    if not f.items then rebuild(f) end
     paint(f)
     f.summaryScroll:setHeight((f.summary:GetStringHeight() or 200) + 10)
 end
@@ -245,4 +250,4 @@ local function update(f, elapsed)
     f.summaryScroll:setHeight((f.summary:GetStringHeight() or 200) + 10)
 end
 
-UI.screens.runes = { label = "룬", order = 5, create = create, refresh = refresh, update = update, paint = paint }
+UI.screens.runes = { label = "룬", order = 6, create = create, refresh = refresh, update = update, paint = paint, onShow = onShow }

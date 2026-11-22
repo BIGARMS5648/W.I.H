@@ -146,7 +146,7 @@ T.case("룬 화면: 구매가 골드와 룬 레벨에 반영된다", function()
     T.eq(Game.partySlots(s), 2)
     -- 골드가 모자라면 버튼이 꺼진다
     s.gold = 0
-    UI.screens.runes.refresh(f)
+    f = open("runes")
     for n = 1, #f.items do
         local row = f.rows[n]
         if row.buy:IsShown() then T.ok(not row.buy.enabled, "골드가 없으면 구매 버튼이 꺼짐") end
@@ -198,11 +198,80 @@ T.case("스테이지 화면: 잠긴 곳은 못 가고, 열린 곳으로는 이�
     noErrors("스테이지 화면")
 end)
 
+T.case("가방 화면: 첫 클리어 보상, 장착·해제, 잠금, 팔기, 칸 구매, 상자 열기", function()
+    local s = App.state
+    local Items, Inventory, Chests = WIH.Items, WIH.Inventory, WIH.Chests
+    -- 시험 준비: 가방을 비우고 정해진 아이템을 넣는다.
+    s.inventory.items, s.mail = {}, {}
+    for id, h in pairs(s.heroes) do h.gear = {} end
+    local sword, staff, helmet = Items.find("SWORD", 1, 1), Items.find("STAFF", 1, 1), Items.find("HELMET", 1, 2)
+    Inventory.add(s, sword.id); Inventory.add(s, staff.id); Inventory.add(s, helmet.id)
+    local f = open("bag")
+    f.heroRows[1]:Click("LeftButton")
+    T.eq(f.heroId, s.party[1])
+    f.heroId = "war_prot"
+    UI.screens.bag.refresh(f)
+    T.ok(f.cells[1]:IsShown() and f.cells[20]:IsShown() and not f.cells[21], "칸 수 = 가방 용량")
+    -- 고르면 상세가 보이고, 장착 버튼으로 낀다
+    f.cells[1]:Click("LeftButton")
+    T.eq(f.selected, 1)
+    T.ok(f.dEquip:IsShown() and f.dEquip.enabled)
+    T.ok(f.dName:GetText():find("한손검"), "상세에 이름이 보임: " .. f.dName:GetText())
+    f.dEquip:Click("LeftButton")
+    T.eq(s.heroes.war_prot.gear.MAIN.id, sword.id)
+    T.eq(#s.inventory.items, 2)
+    -- 쓸 수 없는 무기는 장착 버튼이 꺼지고, 오른쪽 클릭으로도 끼워지지 않는다
+    f.cells[1]:Click("LeftButton")
+    T.ok(not f.dEquip.enabled, "전사는 지팡이를 못 낌")
+    f.cells[1]:Click("RightButton")
+    T.eq(s.heroes.war_prot.gear.MAIN.id, sword.id)
+    -- 오른쪽 클릭으로 바로 장착
+    f.cells[2]:Click("RightButton")
+    T.eq(s.heroes.war_prot.gear.HELMET.id, helmet.id)
+    -- 해제
+    f.slots.HELMET.off:Click("LeftButton")
+    T.eq(s.heroes.war_prot.gear.HELMET, nil)
+    T.eq(#s.inventory.items, 2)
+    -- 잠금과 팔기
+    f.selected = 2
+    UI.screens.bag.refresh(f)
+    f.dLock:Click("LeftButton")
+    T.eq(s.inventory.items[2].lock, true)
+    T.ok(not f.dSell.enabled, "잠근 것은 팔기 버튼이 꺼짐")
+    local gold = s.gold
+    f.bulk:Click("LeftButton")
+    T.eq(#s.inventory.items, 1, "잠근 것만 남음")
+    T.eq(s.gold, gold + Inventory.alchemyValue(s, staff))
+    -- 칸 구매
+    local cost = Inventory.nextSlotCost(s)
+    s.gold = cost
+    UI.screens.bag.refresh(f)
+    f.buy:Click("LeftButton")
+    T.eq(Inventory.capacity(s), 21 + Runes.total(s, "MaxInventorySlot"))
+    T.eq(s.gold, 0)
+    -- 상자
+    s.chests.normal.list = { 1, 1, 1 }
+    UI.screens.bag.refresh(f)
+    T.ok(f.chestRows.normal.open.enabled)
+    T.ok(not f.chestRows.normal.all.enabled, "모두 열기는 룬이 있어야 함")
+    f.chestRows.normal.open:Click("LeftButton")
+    T.eq(Chests.count(s, "normal"), 2)
+    T.ok(not f.chestRows.stage.open.enabled or Chests.count(s, "stage") > 0)
+    -- 툴팁 내용이 만들어지는지
+    T.ok(UI.itemTip(sword, nil, staff).title ~= nil)
+    T.ok(f.slots.MAIN.tooltip(f.slots.MAIN).title:find("한손검"))
+    f.apply:Click("LeftButton")
+    T.near(App.session.runner.heroes[1]:get("AttackDamage") >= 3 and 1 or 0, 1, 0, "장비가 전투에 반영됨")
+    noErrors("가방 화면")
+end)
+
 T.case("모든 화면의 보이는 버튼을 눌러도 오류가 없다", function()
     local s = App.state
     s.gold = 5e8
     for id, h in pairs(s.heroes) do h.level = 60 end
-    local order = { "battle", "heroes", "party", "stage", "runes" }
+    local order = { "battle", "heroes", "bag", "party", "stage", "runes" }
+    for _ = 1, 12 do WIH.Inventory.add(s, WIH.Items.find("HELMET", 1, 1).id) end
+    s.chests.normal.list, s.chests.stage.list = { 1, 1, 1 }, { 2, 2 }
     local clicks = 0
     for round = 1, 3 do
         for _, id in ipairs(order) do

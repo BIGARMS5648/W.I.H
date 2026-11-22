@@ -45,7 +45,7 @@ local function section(f, title, y)
     t:SetText(title)
     local line = UI.fill(f, C.line, "ARTWORK")
     line:SetPoint("TOPLEFT", 14, y - 18)
-    line:SetPoint("RIGHT", -14, 0)
+    line:SetPoint("TOPRIGHT", -14, y - 18)
     line:SetHeight(1)
     return t
 end
@@ -95,13 +95,13 @@ local function create(parent)
     section(f, "저장 데이터", -154)
     f.saveInfo = UI.paragraph(f, 11, C.sub)
     f.saveInfo:SetPoint("TOPLEFT", 14, -182)
-    f.saveInfo:SetPoint("RIGHT", -14, 0)
+    f.saveInfo:SetPoint("TOPRIGHT", -14, -182)
     f.backups = {}
     for i = 1, Save.BACKUPS do
         local row = CreateFrame("Frame", nil, f)
         row:SetHeight(26)
         row:SetPoint("TOPLEFT", 14, -236 - (i - 1) * 30)
-        row:SetPoint("RIGHT", -14, 0)
+        row:SetPoint("TOPRIGHT", -14, -236 - (i - 1) * 30)
         row.text = UI.text(row, 11, C.sub)
         row.text:SetPoint("LEFT", 0, 0)
         row.restore = UI.button(row, "이 백업으로 되돌리기", 150, 24, function()
@@ -133,13 +133,13 @@ local function create(parent)
     section(f, "기록", -376)
     f.stats = UI.paragraph(f, 11, C.sub)
     f.stats:SetPoint("TOPLEFT", 14, -404)
-    f.stats:SetPoint("RIGHT", -14, 0)
+    f.stats:SetPoint("TOPRIGHT", -14, -404)
 
     -- 오류
     f.errorTitle = section(f, "최근 오류", -446)
     f.errors = UI.paragraph(f, 11, C.bad)
     f.errors:SetPoint("TOPLEFT", 14, -474)
-    f.errors:SetPoint("RIGHT", -130, 0)
+    f.errors:SetPoint("TOPRIGHT", -130, -474)
     f.resume = UI.button(f, "진행 다시 시작", 110, 24, function()
         App.paused = false
         App.restartStage()
@@ -207,4 +207,4 @@ local function update(f, elapsed)
     refresh(f)
 end
 
-UI.screens.settings = { label = "설정", order = 6, create = create, refresh = refresh, update = update }
+UI.screens.settings = { label = "설정", order = 7, create = create, refresh = refresh, update = update }
