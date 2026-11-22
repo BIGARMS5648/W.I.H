@@ -209,8 +209,24 @@ function B:hit(src, dst, spec)
     if not dst.alive then return 0 end
     local off = src.statOwner or src
     local elem = spec.elem or "Physical"
+    local rh = off.relic           -- 유물 공명이 거는 타격 규칙(Progression/Relics.lua). 없으면 nil
     local dmg = off:get("AttackDamage") * spec.coef
     dmg = dmg * (1 + off:get(elem .. "DamagePercent"))
+    if rh then
+        local elemental = elem == "Fire" or elem == "Cold" or elem == "Lightning"
+        if rh.prism and elemental then           -- 처음 준 원소로 고정, 다른 원소는 주지 못한다
+            if not rh.prismElem then rh.prismElem = elem end
+            if elem ~= rh.prismElem then return 0 end
+            dmg = dmg * (1 + rh.prism)
+        end
+        if rh.elemMult and rh.elemMult[elem] then dmg = dmg * rh.elemMult[elem] end
+        if rh.twinborn and ((elem == "Cold" and dst:hasStatus("Ignite")) or (elem == "Fire" and dst:hasStatus("Chill"))) then
+            dmg = dmg * (1 + rh.twinborn)
+        end
+        if rh.skillMult and spec.skill then dmg = dmg * rh.skillMult end
+        if rh.convert and rh.convert[elem] then elem = "Chaos" end    -- 원래 원소의 피해 증가를 적용한 뒤 암흑으로
+        if rh.corrupt and elem == "Chaos" then dmg = dmg * (1 + off:get("CriticalDamage") * rh.corrupt) end
+    end
     if spec.melee then dmg = dmg * off:get("IncreaseMeleeDamage") end
     if spec.proj then dmg = dmg * off:get("IncreaseProjectileDamage") end
     if spec.aoe then dmg = dmg * off:get("IncreaseAreaOfEffectDamage") end
@@ -226,16 +242,29 @@ function B:hit(src, dst, spec)
     elseif dst:hpRatio() <= 0.5 then dmg = dmg * (1 + off:get("LowHpTargetDamage")) end
 
     local crit = false
-    if not spec.isDot and spec.canCrit ~= false then
+    local canCrit = not spec.isDot and spec.canCrit ~= false
+    -- 소환물은 주인의 치명타를 이어받지 않는다(동반자 공명이 있으면 이어받는다) [추정: 원작 유물 "Companion's Reliquary"]
+    if src.kind == "summon" and not (rh and rh.summonCrit) then canCrit = false end
+    if rh and rh.corrupt and elem == "Chaos" then canCrit = false end
+    if canCrit then
         local chance = off:get("CriticalChance")
         if fullHp then chance = chance * (1 + off:get("FullHpTargetCriticalChance")) end
         if spec.critChanceMult then
             chance = chance * spec.critChanceMult
             if chance > 1 then chance = 1 end
         end
-        if spec.forceCrit or self.rng:chance(chance) then
+        local force = spec.forceCrit
+        if rh and rh.onset and spec.skill then       -- 스테이지의 첫 공격 스킬은 확정 치명타
+            if not rh.onsetSkill then rh.onsetSkill, rh.onsetUntil = spec.skill, self.time + 0.2 end
+            if rh.onsetSkill == spec.skill and self.time <= rh.onsetUntil then force = true end
+        end
+        if force or self.rng:chance(chance) or (rh and rh.keen and self.rng:chance(chance)) then
             crit = true
-            dmg = dmg * (off:get("CriticalDamage") + (spec.critDmgBonus or 0))
+            local bonus = spec.critDmgBonus or 0
+            local frozen = rh and rh.icicle and dst:findEffect("status:Freeze")
+            if frozen then bonus = bonus + rh.icicle end
+            dmg = dmg * (off:get("CriticalDamage") + bonus)
+            if frozen then self:removeEffect(dst, frozen) end       -- 치명타가 빙결을 깬다
         end
     end
     if not spec.isDot then
@@ -341,9 +370,9 @@ function B:receive(src, dst, dmg, elem, spec, crit)
         if not spec.isDot then
             -- 공격자 쪽 회복과 발동 효과
             local leech = owner:get("HpLeech") + (spec.leech or 0)
-            if leech > 0 then self:heal(owner, owner, dmg * leech, true) end
+            if leech > 0 then self:selfHeal(owner, dmg * leech) end
             local perHit = owner:get("AddHpPerHit")
-            if perHit > 0 then self:heal(owner, owner, perHit, true) end
+            if perHit > 0 then self:selfHeal(owner, perHit) end
             runTriggers(self, owner, "onDealDamage", dst, dmg, spec, crit)
         else
             runTriggers(self, owner, "onDotTick", dst, dmg, spec)
@@ -443,7 +472,7 @@ function B:kill(src, dst)
         owner.stats.kills = owner.stats.kills + 1
         if owner.alive then
             local perKill = owner:get("AddHpPerKill")
-            if perKill > 0 then self:heal(owner, owner, perKill, true) end
+            if perKill > 0 then self:selfHeal(owner, perKill) end
             runTriggers(self, owner, "onKill", dst)
         end
     end
@@ -470,6 +499,14 @@ function B:heal(src, dst, amount, raw)
         if owner then owner.stats.healed = owner.stats.healed + done end
         self:emit("heal", src, dst, done)
     end
+    return done
+end
+
+-- 흡혈·타격 회복·처치 회복. 최대 체력을 넘친 양은 "overheal" 사건으로 알린다(맹세 공명).
+function B:selfHeal(u, amount)
+    if not u.alive or amount <= 0 then return 0 end
+    local done = self:heal(u, u, amount, true)
+    if amount - done > 1e-9 then self:emit("overheal", u, amount - done) end
     return done
 end
 

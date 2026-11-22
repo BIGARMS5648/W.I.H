@@ -53,6 +53,40 @@ Relics.EFFECTS = {
     [790017] = { "bleedSpread", 0, 0, "선혈", "출혈 중인 적이 죽으면 주변의 적에게 출혈" },
     [797047] = { "pureLight", 100, 200, "순수한 빛", "번개 치명타가 감전을 걸고, 감전된 적은 번개 피해를 %s 더 받음" },
     [797052] = { "resonator", 500, 500, "공명기", "장착한 다른 유물함의 공명 수치 +%s" },
+    -- 원작 1.3.0의 나머지 공명 [원작 조건·수치 / 근사는 설명에 적었다]
+    [790002] = { "frostfire", 0, 0, "서리불꽃", "빙결된 적이 화염 피해를 받으면 빙결이 풀리고 점화된다" },
+    [790003] = { "trapCopy", 100, 200, "덫사냥꾼", "덫이 터지면 %s 확률로 같은 자리에 같은 덫 하나(복제된 덫은 다시 복제되지 않음)" },
+    [790022] = { "trapCopy", 300, 500, "덫사냥꾼", "덫이 터지면 %s 확률로 같은 자리에 같은 덫 하나(복제된 덫은 다시 복제되지 않음)" },
+    [790004] = { "onset", 0, 0, "선제", "스테이지마다 영웅의 첫 공격 스킬이 확정 치명타" },
+    [790010] = { "oath", 500, 1500, "맹세", "최대 체력을 넘친 흡혈·타격·처치 회복의 %s만큼 주변 적에게 번개 피해" },
+    [794033] = { "oath", 2000, 5000, "맹세", "최대 체력을 넘친 흡혈·타격·처치 회복의 %s만큼 주변 적에게 번개 피해" },
+    [790015] = { "tranquil", 2, 2, "고요", "재사용 감소가 적용되지 않는 대신, 재사용 감소 1%%당 스킬 피해 %s%%", raw = true },
+    [790028] = { "icicle", 500, 1000, "고드름", "빙결된 적에게 치명타 피해 +%s, 대신 치명타가 빙결을 깬다" },
+    [794014] = { "swift", 30, 50, "질풍", "적을 처치할 때마다 파티 이동속도 +1%%(5초, 최대 %s중첩)", raw = true },
+    [794040] = { "swift", 60, 100, "질풍", "적을 처치할 때마다 파티 이동속도 +1%%(5초, 최대 %s중첩)", raw = true },
+    [794019] = { "chain", 2000, 2000, "연쇄 반응", "점화된 적이 감전되면 폭발해 300 안의 적에게 화염 피해 %s" },
+    [794025] = { "convertFire", 0, 0, "검은 불꽃", "화염 피해가 암흑 피해로 바뀐다" },
+    [794026] = { "convertCold", 0, 0, "검은 서리", "냉기 피해가 암흑 피해로 바뀐다" },
+    [794027] = { "convertLightning", 0, 0, "검은 번개", "번개 피해가 암흑 피해로 바뀐다" },
+    [794032] = { "bitterCold", 0, 0, "혹한", "모든 냉기 피해가 냉각을 걸고, 대신 화염 피해 -50%%" },
+    [794035] = { "companion", 0, 0, "동반자", "소환물이 주인의 치명타 확률로 치명타를 낸다" },
+    [794036] = { "corrupt", 200, 400, "타락", "암흑 피해가 치명타 피해 수치의 %s만큼 늘고, 대신 암흑 피해는 치명타가 나지 않는다" },
+    [794041] = { "keen", 0, 0, "예리함", "치명타가 나지 않으면 치명타 판정을 한 번 더 한다 [근사]" },
+    [795016] = { "prism", 300, 500, "프리즘", "스테이지에서 처음 준 원소(화염·냉기·번개)로 고정: 그 원소 피해 +%s, 다른 원소 피해는 줄 수 없다" },
+    [795043] = { "prism", 300, 500, "프리즘", "스테이지에서 처음 준 원소(화염·냉기·번개)로 고정: 그 원소 피해 +%s, 다른 원소 피해는 줄 수 없다" },
+    [797045] = { "pureFlame", 0, 0, "순수한 불꽃", "모든 화염 피해가 점화를 걸고, 점화 피해 +100%%" },
+    [797046] = { "pureFrost", 250, 300, "순수한 서리", "체력 %s 이하의 빙결된 적이 물리 피해를 받으면 즉사(보스는 기준의 절반)" },
+    [797050] = { "twinborn", 250, 500, "두 원소", "점화된 적에게 냉기 피해 +%s, 냉각된 적에게 화염 피해 +%s" },
+    -- 광란(영웅 전용) [원작: 기사·레인저·소서러·헌터·슬레이어 / 독자: 전사·사냥꾼·마법사·땜장이·도적에 대응]
+    [797053] = { "rampantCd:WARRIOR", 100, 500, "광란(전사)", "전사의 공격 스킬에 재사용 대기가 없고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
+    [797054] = { "rampantCd:HUNTER", 100, 500, "광란(사냥꾼)", "사냥꾼의 공격 스킬에 재사용 대기가 없고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
+    [797055] = { "rampantCd:MAGE", 100, 500, "광란(마법사)", "마법사의 공격 스킬에 재사용 대기가 없고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
+    [797057] = { "rampantCd:TINKER", 100, 500, "광란(땜장이)", "땜장이의 공격 스킬에 재사용 대기가 없고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
+    [797058] = { "rampantCd:ROGUE", 100, 500, "광란(도적)", "도적의 공격 스킬에 재사용 대기가 없고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
+    [797060] = { "rampantCount:WARRIOR", 100, 500, "광란(전사)", "전사의 공격 스킬이 기본 공격 횟수 없이 나가고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
+    [797061] = { "rampantCount:HUNTER", 100, 500, "광란(사냥꾼)", "사냥꾼의 공격 스킬이 기본 공격 횟수 없이 나가고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
+    [797062] = { "rampantCount:TINKER", 100, 500, "광란(땜장이)", "땜장이의 공격 스킬이 기본 공격 횟수 없이 나가고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
+    [797063] = { "rampantCount:ROGUE", 100, 500, "광란(도적)", "도적의 공격 스킬이 기본 공격 횟수 없이 나가고, 대신 쓸 때마다 최대 체력의 %s를 쓴다" },
 }
 
 local function fail(reason) return false, reason end
@@ -395,6 +429,34 @@ function Relics.install(battle, heroes, state)
                 end })
         end
     end
+    -- 영웅마다 타격 규칙(Battle의 B:hit가 읽는다)
+    local Heroes = WIH.Heroes
+    for _, h in ipairs(heroes) do
+        local rh = {}
+        local class = h.heroId and Heroes.byId[h.heroId] and Heroes.byId[h.heroId].class
+        if on.prism then rh.prism = on.prism / 1000 end
+        if on.bitterCold then rh.elemMult = { Fire = 0.5 } end
+        if on.twinborn then rh.twinborn = on.twinborn / 1000 end
+        if on.convertFire or on.convertCold or on.convertLightning then
+            rh.convert = { Fire = on.convertFire and true or nil, Cold = on.convertCold and true or nil, Lightning = on.convertLightning and true or nil }
+        end
+        if on.corrupt then rh.corrupt = on.corrupt / 1000 end
+        if on.onset then rh.onset = true end
+        if on.keen then rh.keen = true end
+        if on.icicle then rh.icicle = on.icicle / 1000 end
+        if on.companion then rh.summonCrit = true end
+        if on.trapCopy then rh.trapCopy = on.trapCopy / 1000 end
+        if class and on["rampantCd:" .. class] then rh.rampantCd = on["rampantCd:" .. class] / 1000 end
+        if class and on["rampantCount:" .. class] then rh.rampantCount = on["rampantCount:" .. class] / 1000 end
+        if on.tranquil then
+            local cdr = h:get("CooldownReduction")
+            battle:addEffect(h, { id = "relic:tranquil", kind = "buff", dur = 1e9, mods = { { "CooldownReduction", M, -1000 } } })
+            rh.skillMult = 1 + cdr * on.tranquil
+        end
+        if next(rh) then h.relic = rh end
+    end
+    local function heroOwned(u) local o = u and (u.statOwner or u); return o and o.team == 1 and o.kind == "hero" and o or nil end
+
     local phoenixUsed, busy = false, false
     battle.listeners[#battle.listeners + 1] = function(ev, a, b, c, d, e, f)
         if busy then return end
@@ -416,12 +478,52 @@ function Relics.install(battle, heroes, state)
                 battle:applyStatus(src, dst, "Shock")
                 battle:addEffect(dst, { id = "relic:pureLight", kind = "debuff", dur = 6, mods = { { "TakenLightning", F, on.pureLight } } })
             end
+            if heroOwned(src) and dst.team == 2 and dst.alive then
+                local frozen = dst:findEffect("status:Freeze")
+                if on.frostfire and frozen and elem == "Fire" then
+                    battle:removeEffect(dst, frozen)
+                    battle:applyStatus(src, dst, "Ignite")
+                elseif on.pureFrost and frozen and elem == "Physical" then
+                    local limit = on.pureFrost / 1000 * (dst.isBoss and 0.5 or 1)
+                    if dst:hpRatio() <= limit then battle:kill(src, dst) end
+                end
+                if dst.alive and on.bitterCold and elem == "Cold" then battle:applyStatus(src, dst, "Chill") end
+                if dst.alive and on.pureFlame and elem == "Fire" then
+                    local ig = battle:applyStatus(src, dst, "Ignite")
+                    if ig and ig.dot and not ig.relicDoubled then ig.dot.coef, ig.relicDoubled = ig.dot.coef * 2, true end
+                end
+            end
+            busy = false
+        elseif ev == "overheal" and on.oath then
+            local u, amount = a, b
+            if u.team ~= 1 then return end
+            busy = true
+            for _, o in ipairs(battle.units) do
+                if o.team == 2 and o.alive and math.abs(o.x - u.x) <= 300 then
+                    battle:receive(u, o, amount * on.oath / 1000, "Lightning", { noAvoid = true, isReflect = true, relic = true })
+                end
+            end
             busy = false
         elseif ev == "revive" then
             if a == leader then lead(a) end
         elseif ev == "effect" and c and b and b.status and a and a.team == 2 then
             if b.status == "Ignite" then a.relicIgnite = b.expires or 0 end
             if b.status == "Bleed" then a.relicBleed = b.expires or 0 end
+            if b.status == "Ignite" and on.pureFlame and b.dot and not b.relicDoubled and heroOwned(b.src) then
+                b.dot.coef, b.relicDoubled = b.dot.coef * 2, true
+            end
+            if b.status == "Shock" and on.chain and a.alive and a:hasStatus("Ignite") and heroOwned(b.src) then
+                busy = true
+                local center, src = a, b.src
+                local ig = center:findEffect("status:Ignite")
+                if ig then battle:removeEffect(center, ig, true) end
+                for _, o in ipairs(battle.units) do
+                    if o.team == 2 and o.alive and math.abs(o.x - center.x) <= 300 then
+                        battle:hit(src, o, { coef = on.chain / 1000, elem = "Fire", aoe = true, canCrit = false, relic = true })
+                    end
+                end
+                busy = false
+            end
         elseif ev == "death" then
             local dst, src = a, b
             busy = true
@@ -438,6 +540,14 @@ function Relics.install(battle, heroes, state)
                     end
                 end
             elseif dst.team == 2 then
+                if on.swift and heroOwned(src) then
+                    for _, h in ipairs(heroes) do
+                        if h.alive then
+                            battle:addEffect(h, { id = "relic:swift", kind = "buff", dur = 5, maxStacks = on.swift,
+                                mods = { { "MovementSpeed", I, 10 } } })
+                        end
+                    end
+                end
                 local spread = (on.igniteSpread and dst.relicIgnite and dst.relicIgnite > battle.time) and "Ignite"
                     or ((on.bleedSpread and dst.relicBleed and dst.relicBleed > battle.time) and "Bleed") or nil
                 if spread then

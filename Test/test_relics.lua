@@ -258,6 +258,150 @@ T.case("공명(전투): 불사조는 한 번 되살리고, 공허는 추가 암�
     T.ok(by.Chaos > 0 and by.Chaos <= by.Physical * 0.1 + 1e-6, "준 피해의 10% 이하(저항 적용)")
 end)
 
+-- 가장 낮은 완성 등급
+local function finishedGrade(id)
+    local best
+    for g, row in pairs(RelicTable.RELIQUARIES[id].grades) do
+        if not row[3] and (not best or g < best) then best = g end
+    end
+    return best
+end
+
+local function setup(id, res, monsterHp, heroId)
+    local s = newState()
+    openSlots(s)
+    resonate(s, id, finishedGrade(id), res)
+    local b = Battle.new({ seed = 3, stageLevel = 10, autoRevive = false })
+    local hero = HeroBuild.spawn(b, heroId or "war_prot", { account = Runes.sheet(s), rank = 1, x = 0,
+        skills = heroId and { { WIH.Heroes.byId[heroId].skills[1], 1 } } or nil })
+    local mobs = {}
+    for i = 1, 3 do
+        local m = WIH.Unit.new({ name = "허수아비", team = 2, kind = "monster", base = { MaxHp = monsterHp or 1e9, AttackDamage = 0, MovementSpeed = 0, AttackSpeed = 1 },
+            static = Sheet.new(), melee = true, range = 100, x = 50 + (i - 1) * 40 })
+        m.hp = m:get("MaxHp")
+        b:addUnit(m)
+        mobs[i] = m
+    end
+    Relics.install(b, { hero }, s)
+    local events = {}
+    b.listeners[#b.listeners + 1] = function(ev, x1, x2, x3, x4, x5) events[#events + 1] = { ev, x1, x2, x3, x4, x5 } end
+    return b, hero, mobs, events
+end
+
+T.case("공명 62종이 모두 효과를 갖고, 설명문이 만들어진다", function()
+    local n = 0
+    for id in pairs(RelicTable.RELIQUARIES) do
+        T.ok(Relics.EFFECTS[id], "효과 없음: " .. id)
+        T.ok(Relics.effectText({ id = id, res = Relics.EFFECTS[id] and Relics.EFFECTS[id][3] }) ~= "", "설명문")
+        n = n + 1
+    end
+    T.eq(n, 62)
+end)
+
+T.case("공명(규칙): 원소 전환·프리즘·두 원소·혹한", function()
+    local b, hero, mobs, events = setup(794025)
+    b:hit(hero, mobs[1], { coef = 1, elem = "Fire" })
+    T.eq(events[#events][1], "damage"); T.eq(events[#events][5], "Chaos", "화염 → 암흑")
+    b, hero, mobs, events = setup(795016, 400)
+    T.ok(b:hit(hero, mobs[1], { coef = 1, elem = "Cold" }) > 0)
+    T.eq(b:hit(hero, mobs[1], { coef = 1, elem = "Fire" }), 0, "처음 준 원소(냉기)가 아니면 피해 없음")
+    T.ok(b:hit(hero, mobs[1], { coef = 1, elem = "Physical" }) > 0, "물리는 그대로")
+    b, hero, mobs = setup(797050, 500)
+    local plain = b:hit(hero, mobs[1], { coef = 1, elem = "Cold", canCrit = false })
+    b:applyStatus(hero, mobs[2], "Ignite")
+    local boosted = b:hit(hero, mobs[2], { coef = 1, elem = "Cold", canCrit = false })
+    T.ok(boosted > plain * 1.4, "점화된 적에게 냉기 +50%")
+    b, hero, mobs = setup(794032)
+    b:hit(hero, mobs[1], { coef = 1, elem = "Cold" })
+    T.ok(mobs[1]:hasStatus("Chill"), "냉기 피해가 냉각을 건다")
+end)
+
+T.case("공명(규칙): 서리불꽃·순수한 서리·순수한 불꽃·연쇄 반응", function()
+    local b, hero, mobs = setup(790002)
+    b:applyStatus(hero, mobs[1], "Freeze")
+    b:hit(hero, mobs[1], { coef = 1, elem = "Fire" })
+    T.ok(not mobs[1]:hasStatus("Freeze") and mobs[1]:hasStatus("Ignite"), "빙결이 풀리고 점화")
+    b, hero, mobs = setup(797046, 300, 1000)
+    mobs[1].hp = 250
+    b:applyStatus(hero, mobs[1], "Freeze")
+    b:hit(hero, mobs[1], { coef = 0.01, elem = "Physical", canCrit = false })
+    T.ok(not mobs[1].alive, "체력 30% 이하의 빙결된 적이 물리 피해로 즉사")
+    b, hero, mobs = setup(797045)
+    b:hit(hero, mobs[1], { coef = 1, elem = "Fire" })
+    local ig = mobs[1]:findEffect("status:Ignite")
+    T.ok(ig, "화염 피해가 점화를 건다")
+    T.near(ig.dot.coef, WIH.Battle.STATUS.Ignite.dot.coef * 2, 1e-9, "점화 피해 2배")
+    local events
+    b, hero, mobs, events = setup(794019)
+    b:applyStatus(hero, mobs[1], "Ignite")
+    local n0 = #events
+    b:applyStatus(hero, mobs[1], "Shock")
+    local fire = 0
+    for i = n0 + 1, #events do if events[i][1] == "damage" and events[i][5] == "Fire" then fire = fire + 1 end end
+    T.eq(fire, 3, "점화된 적이 감전되면 300 안의 적 셋에게 화염 폭발")
+    T.ok(not mobs[1]:hasStatus("Ignite"), "폭발한 점화는 사라진다")
+end)
+
+T.case("공명(규칙): 선제·예리함·고드름·동반자(소환물 치명타)·타락", function()
+    local b, hero, mobs, events = setup(790004)
+    local skill = { id = "x" }
+    b:hit(hero, mobs[1], { coef = 1, skill = skill })
+    T.eq(events[#events][6], true, "첫 공격 스킬은 확정 치명타")
+    -- 소환물: 기본은 치명타가 나지 않는다
+    local function summonCrits(id)
+        local bb, h, ms, ev = setup(id)
+        h.static.flat.CriticalChance = 5000; h:invalidate()
+        local pet = WIH.Unit.new({ name = "소환물", team = 1, kind = "summon", owner = h, base = { MaxHp = 100, AttackSpeed = 100 }, x = 0 })
+        bb:addUnit(pet)
+        bb:hit(pet, ms[1], { coef = 1 })
+        return ev[#ev][6]
+    end
+    T.eq(summonCrits(790004), false, "소환물은 주인의 치명타를 이어받지 않는다")
+    T.eq(summonCrits(794035), true, "동반자: 소환물이 치명타를 낸다")
+    b, hero, mobs, events = setup(790028, 1000)
+    hero.static.flat.CriticalChance = 5000; hero:invalidate()
+    local base = b:hit(hero, mobs[2], { coef = 1 })
+    b:applyStatus(hero, mobs[1], "Freeze")
+    local frozenHit = b:hit(hero, mobs[1], { coef = 1 })
+    T.ok(frozenHit > base * 1.2, "빙결된 적에게 치명타 피해 증가")
+    T.ok(not mobs[1]:hasStatus("Freeze"), "치명타가 빙결을 깬다")
+    b, hero, mobs, events = setup(794036, 400)
+    hero.static.flat.CriticalChance = 5000; hero:invalidate()
+    b:hit(hero, mobs[1], { coef = 1, elem = "Chaos" })
+    T.eq(events[#events][6], false, "타락: 암흑 피해는 치명타가 나지 않는다")
+end)
+
+T.case("공명(규칙): 고요·질풍·맹세·광란", function()
+    local b, hero, mobs = setup(790015)
+    T.eq(hero:get("CooldownReduction"), 0, "재사용 감소가 적용되지 않는다")
+    T.ok(hero.relic.skillMult >= 1)
+    b, hero, mobs = setup(794014, 30, 10)
+    b:kill(hero, mobs[1]); b:kill(hero, mobs[2])
+    local sw = hero:findEffect("relic:swift")
+    T.ok(sw and sw.stacks == 2, "처치마다 이동속도 중첩")
+    local events
+    b, hero, mobs, events = setup(790010, 1500)
+    hero.static.flat.HpLeech = 1000; hero:invalidate()
+    local n0 = #events
+    b:hit(hero, mobs[1], { coef = 1, canCrit = false })
+    local light = 0
+    for i = n0 + 1, #events do if events[i][1] == "damage" and events[i][5] == "Lightning" then light = light + 1 end end
+    T.ok(light >= 1, "체력이 가득할 때 넘친 흡혈만큼 번개 피해")
+    -- 광란(마법사): 공격 스킬(화염구)을 재사용 대기 없이 쓰고 최대 체력을 쓴다
+    b, hero, mobs = setup(797055, 100, 1e9, "mag_fire")
+    T.eq(hero.skills[1].def.act.type, "cd")
+    T.ok(WIH.Skills.isAttack(hero.skills[1].def))
+    T.ok(WIH.Skills.isAttack(WIH.SkillData.resolve("fire_flamestrike")), "적에게 피해를 주는 영역도 공격 스킬")
+    T.ok(not WIH.Skills.isAttack(WIH.SkillData.resolve("arms_sweeping")), "버프는 공격 스킬이 아니다")
+    b:run(4)
+    T.ok((hero.stats.casts or 0) >= 4, "재사용 대기 없이 여러 번 쓴다: " .. tostring(hero.stats.casts))
+    hero.hp = hero:get("MaxHp")
+    WIH.Skills.cast(b, hero, hero.skills[1], mobs[1])
+    T.near(hero.hp, hero:get("MaxHp") * 0.9, 1e-6, "쓸 때마다 최대 체력의 10%를 쓴다")
+    local b2, other = setup(797055, 100, 1e9, "war_arms")
+    T.eq(other.relic and other.relic.rampantCd, nil, "다른 직업에는 걸리지 않는다")
+end)
+
 T.case("기원: 오염된 재료 → 투입 등급 이상의 유물함·유물, 구현한 공명만", function()
     local s = newState()
     local rng = Rng.new(5)

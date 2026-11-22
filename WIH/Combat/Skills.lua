@@ -563,6 +563,16 @@ function exec.trap(b, u, eff, L, ctx)
             zone.done = true
             zone.expires = battle.time
             Skills.runEffects(battle, u, eff.effects, L, { slot = slot, target = list[1], point = zone.x })
+            -- 사냥꾼의 공명: 터진 자리에 같은 덫이 하나 더(복제된 덫은 다시 복제되지 않는다)
+            local rh = (u.statOwner or u).relic
+            if not zone.isCopy and rh and rh.trapCopy and battle.rng:chance(rh.trapCopy) then
+                local copy = {}
+                for k, v in pairs(zone) do copy[k] = v end
+                copy.done, copy.isCopy = false, true
+                copy.dur = eff.dur or 30
+                battle:addZone(copy)
+                traps[#traps + 1] = copy
+            end
         end
     end
     traps[#traps + 1] = z
@@ -881,6 +891,34 @@ function Skills.equip(b, u, def, level)
     return slot
 end
 
+-- 공격 스킬인지: 적에게 피해를 주는 효과(직접 피해, 지속 피해, 덫, 채널링, 적에게 피해를 주는 영역)가 있으면 공격 스킬이다.
+-- 소환·버프·회복 스킬은 아니다.
+local ATTACK_EFFECTS = { damage = true, dot = true, trap = true, channel = true }
+function Skills.isAttack(def)
+    if def.isAttack ~= nil then return def.isAttack end
+    local yes = false
+    for _, eff in ipairs(def.effects or {}) do
+        if ATTACK_EFFECTS[eff.type] then yes = true end
+        if eff.type == "zone" then
+            for _, e in ipairs(eff.enemy or {}) do
+                if e.type == "damage" or e.type == "dot" then yes = true end
+            end
+        end
+    end
+    def.isAttack = yes
+    return yes
+end
+
+-- 광란의 공명(영웅 전용): 재사용 대기 없이(또는 기본 공격 횟수 없이) 쓰는 대신 최대 체력을 쓴다.
+local function rampant(u, slot)
+    local rh = u.relic
+    if not rh or not Skills.isAttack(slot.def) then return nil end
+    if slot.def.act.type == "cd" then return rh.rampantCd end
+    if slot.def.act.type == "count" then return rh.rampantCount end
+    return nil
+end
+Skills.rampant = rampant
+
 -- 스킬 하나를 실행한다(조건과 대상은 호출하는 쪽이 확인했다고 본다).
 function Skills.cast(b, u, slot, target)
     local def = slot.def
@@ -889,6 +927,11 @@ function Skills.cast(b, u, slot, target)
     b:emit("cast", u, def, target)
     Skills.runEffects(b, u, def.effects, L, ctx)
     u.stats.casts = (u.stats.casts or 0) + 1
+    local cost = rampant(u, slot)
+    if cost and u.alive then
+        u.hp = u.hp - u:get("MaxHp") * cost
+        if u.hp < 1 then u.hp = 1 end           -- [추정] 체력을 써서 쓰러지지는 않는다
+    end
 end
 
 local function skillRange(u, def)
@@ -926,7 +969,9 @@ function Skills.update(b, u, canCast)
     for i = 1, #skills do
         local slot = skills[i]
         local act = slot.def.act
-        if act.type == "cd" then
+        if act.type == "cd" and rampant(u, slot) then
+            slot.charge = slot.cd
+        elseif act.type == "cd" then
             if slot.charge < slot.cd then
                 if not rate then
                     local owner = u.statOwner or u
@@ -948,6 +993,16 @@ function Skills.update(b, u, canCast)
     for i = 1, #skills do
         local slot = skills[i]
         local act = slot.def.act
+        if act.type == "count" and rampant(u, slot) then
+            local target = Skills.findTarget(b, u, slot)
+            if target then
+                slot.count = 0
+                Skills.cast(b, u, slot, target)
+                local lock = CAST_TIME / (u.statOwner or u):get("CastSpeed")
+                if u.lock < lock then u.lock = lock end
+                return true
+            end
+        end
         if act.type == "cd" and slot.charge >= slot.cd - 1e-9 and not slot.spent then
             local target = Skills.findTarget(b, u, slot)
             if target then

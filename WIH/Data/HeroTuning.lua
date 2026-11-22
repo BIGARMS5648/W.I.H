@@ -9,7 +9,7 @@ HeroTuning.damage = {
     ["dru_feral:bear"] = 0.65,
     ["dru_feral:cat"] = 1.21,
     ["dru_resto"] = 1.18,
-    ["hun_bm"] = 0.48,
+    ["hun_bm"] = 0.50,
     ["hun_mm"] = 1.08,
     ["hun_sv"] = 1.38,
     ["mag_arcane"] = 0.99,
@@ -33,8 +33,8 @@ HeroTuning.damage = {
     ["war_arms"] = 0.51,
     ["war_fury"] = 0.99,
     ["war_prot"] = 0.94,
-    ["wlk_aff"] = 1.44,
-    ["wlk_demo"] = 0.41,
+    ["wlk_aff"] = 1.46,
+    ["wlk_demo"] = 0.42,
     ["wlk_destro"] = 1.04,
 }
 
